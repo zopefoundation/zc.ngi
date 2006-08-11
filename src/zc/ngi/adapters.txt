@@ -1,0 +1,62 @@
+============
+NGI Adapters
+============
+
+The NGI is a fairly low-level event-based framework.  Adapters can be
+used to build higher-level sematics.  In this document, we'll describe
+some sample adapters that provide more examples of using the NGI and
+useful building blocks for other applications. The sound for these
+adapters can be found in the zc.ngi.adapters module.
+
+Lines
+=====
+
+The first adapter we'll look at collects input into lines. To
+illustrate this, we'll use a handler from zc.ngi.testing that simply
+prints its input:
+
+    >>> import zc.ngi.testing
+    >>> connection = zc.ngi.testing.Connection()
+    >>> handler = zc.ngi.testing.PrintingHandler(connection)
+ 
+This handler is used by by default as the peer
+of testing connections:
+
+    >>> connection.test_input('x' * 80)
+    -> 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    .> xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+
+    >>> connection.test_close('test')
+    -> CLOSE test
+
+Now, we'll use the lines adapter to break input into lines, separated
+by newlines.  We apply the adapter to a connection:
+
+    >>> import zc.ngi.adapters
+    >>> connection = zc.ngi.testing.Connection()
+    >>> adapter = zc.ngi.adapters.Lines(connection)
+    >>> handler = zc.ngi.testing.PrintingHandler(adapter)
+
+Now, when we provide input, it won't appear until lines are complete:
+
+    >>> connection.test_input('Hello world!')
+    >>> connection.test_input('\n')
+    -> 'Hello world!'
+
+    >>> connection.test_input('Hello\nWorld!\nHow are you')
+    -> 'Hello'
+    -> 'World!'
+
+Only input handling is affected.  Other methods of the adapter behave
+as would the underlying connnection:
+
+    >>> adapter.write('foo')
+    -> 'foo'
+
+    >>> connection.test_close('test')
+    -> CLOSE test
+
+The original connection is available in the connection attribute:
+
+    >>> adapter.connection is connection
+    True

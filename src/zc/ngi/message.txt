@@ -1,0 +1,41 @@
+==============
+Message Client
+==============
+
+The message client is a simple NGI client that sends a single message
+and waits for a response. To illustrate, we'll use a simple echo
+server:
+
+    >>> class EchoServer:
+    ...
+    ...     def __init__(self, connection):
+    ...         self.input = ''
+    ...         connection.setHandler(self)
+    ...
+    ...     def handle_input(self, connection, data):
+    ...         self.input += data
+    ...         if '\n' in self.input:
+    ...             data, self.input = self.input.split('\n', 1)
+    ...             connection.write(data.upper() + '\n')
+    ...
+    ...     def handle_close(self, connection, reason):
+    ...         pass
+
+    >>> import zc.ngi.testing
+    >>> connector = zc.ngi.testing.peer('foo', EchoServer)
+
+and we'll use the message client to send it a message and get a
+response.
+        
+    >>> import zc.ngi.message
+    >>> import re
+    >>> expected = re.compile('\n').search
+    >>> zc.ngi.message.message(connector, 'foo', 'hello world!\n', expected)
+    'HELLO WORLD!\n'
+
+If we give an invalid address, we'll get an exception:
+
+    >>> zc.ngi.message.message(connector, 'bar', 'hello world!\n', expected)
+    Traceback (most recent call last):
+    ...
+    CouldNotConnect: connection refused
