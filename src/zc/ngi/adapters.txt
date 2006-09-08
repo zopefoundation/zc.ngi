@@ -19,7 +19,7 @@ prints its input:
     >>> connection = zc.ngi.testing.Connection()
     >>> handler = zc.ngi.testing.PrintingHandler(connection)
  
-This handler is used by by default as the peer
+This handler is used by default as the peer
 of testing connections:
 
     >>> connection.test_input('x' * 80)
@@ -60,3 +60,61 @@ The original connection is available in the connection attribute:
 
     >>> adapter.connection is connection
     True
+
+Sized Messages
+==============
+
+The second adapter we'll look at will handle binary data organized
+into sized messages.  Each message has two parts, a length, and a
+payload.  Of course, the length gives the length of the payload.
+
+To see this, we'll use the adapter to adapt a testing connection:
+
+    >>> connection = zc.ngi.testing.Connection()
+    >>> adapter = zc.ngi.adapters.Sized(connection)
+    >>> handler = zc.ngi.testing.PrintingHandler(adapter)
+
+Now, we'll generate some input. We do so by providing (big-endian) sizes by
+calling struct pack:
+    
+    >>> import struct
+    >>> message1 = 'Hello\nWorld!\nHow are you?'
+    >>> message2 = 'This is message 2'
+    >>> connection.test_input(struct.pack(">I", len(message1)))
+    >>> connection.test_input(message1[:10])
+    >>> connection.test_input(message1[10:]+ struct.pack(">I", len(message2)))
+    -> 'Hello\nWorld!\nHow are you?'
+
+    >>> connection.test_input(message2)
+    -> 'This is message 2'
+
+Here we saw that our handler got the two messages individually.
+
+If we write a message, we can see that the message is preceeded by the
+message size:
+
+    >>> adapter.write(message1) 
+    -> '\x00\x00\x00\x19'
+    -> 'Hello\nWorld!\nHow are you?'
+   
+Null messages
+-------------
+
+It can be useful to send Null messages to make sure that a client is
+still connected.  The sized adapter supprts such messages.  Calling
+write with None, sends a null message, which is a message with a
+length of 1 << 32 - 1 and no message data:
+
+    >>> adapter.write(None)
+    -> '\xff\xff\xff\xff'
+
+On input, Null messages are ignored by the sized adapter and are not
+sent to the application:
+
+    >>> connection.test_input('\xff\xff\xff\xff')
+
+
+ 
+
+
+
