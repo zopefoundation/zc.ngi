@@ -67,7 +67,9 @@ class IConnection(Interface):
     def setHandler(handler):
         """Set the IConnectionHandler for a connection.
 
-        The handler can be set only once.
+        This methid can only be called in direct response to an
+        implementation call to a IConnectionHandler,
+        IClientConnectHandler, or IServer
         """
 
     def write(data):

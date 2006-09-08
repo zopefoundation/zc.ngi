@@ -60,7 +60,7 @@ Network clients make connections to and then use these connections to
 communicate with servers.  To do so, a client must be provided with an
 IConnector implemantation.  How this happens is outside the scope of
 the NGI.  An IConnector implementation could, for example, be provided
-via the Zope component architecture, or via package_resources entry
+via the Zope component architecture, or via pkg_resources entry
 points.
 
 Let's create a simple client that calls an echo server and verifies
@@ -252,7 +252,7 @@ Note that it is an error to write to a closed connection:
 Server Control
 --------------
 
-The object returned from a listener is a IServerControl.  It provides
+The object returned from a listener is an IServerControl.  It provides
 access to the active connections:
 
     >>> list(listener.connections())
