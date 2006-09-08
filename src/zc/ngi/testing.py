@@ -147,3 +147,25 @@ class peer:
         else:
             handler.connected(Connection(None, self.handler))
 
+# XXX This should move to zope.testing
+import random, socket
+def get_port():
+    """Return a port that is not in use.
+
+    Checks if a port is in use by trying to connect to it.  Assumes it
+    is not in use if connect raises an exception.
+
+    Raises RuntimeError after 10 tries.
+    """
+    for i in range(10):
+        port = random.randrange(20000, 30000)
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            try:
+                s.connect(('localhost', port))
+            except socket.error:
+                # Perhaps we should check value of error too.
+                return port
+        finally:
+            s.close()
+    raise RuntimeError("Can't find port")

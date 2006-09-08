@@ -169,7 +169,7 @@ class _Connection(dispatcher):
             self.__handler_lock.release()
 
     def handle_expt(self):
-        self.handle_close('expt')
+        self.handle_close('socket error')
         
 
 class connector(dispatcher):
@@ -216,7 +216,7 @@ class connector(dispatcher):
     def writable(self):
         return True
 
-    def handle_close(reason):
+    def handle_close(self, reason=None):
         if __debug__:
             self.logger.debug('connector close %r', reason)
         self.__handler.failed_connect(reason)
@@ -239,6 +239,15 @@ class connector(dispatcher):
         self.__handler.connected(
             _Connection(self.socket, self.addr, self.logger))
         return
+
+    def handle_error(self):
+        reason = sys.exc_info()[1]
+        self.logger.exception('connect error')
+        self.__handler.failed_connect(reason)
+        self.close()
+
+    def handle_expt(self):
+        self.handle_close('connection failed')
 
 class listener(asyncore.dispatcher):
 
