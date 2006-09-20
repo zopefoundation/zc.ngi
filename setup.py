@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-name = 'ngi'
+name = 'zc.ngi'
 setup(
     name = name,
     version = "0.1",
