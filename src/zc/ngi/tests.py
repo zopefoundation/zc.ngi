@@ -15,10 +15,11 @@
 
 $Id$
 """
-import unittest
+import threading, unittest
 from zope.testing import doctest
 import zc.ngi.testing
-import zc.ngi.async # start async thread before tests run
+import zc.ngi.async
+import zc.ngi.wordcount
 
 def test_async_cannot_connect():
     """Let's make sure that the connector handles connection failures correctly
@@ -50,13 +51,67 @@ def test_async_cannot_connect():
     
     """
 
+class BrokenConnect:
+
+    connected = failed_connect = __call__ = lambda: xxxxx
+    
+class BrokenAfterConnect:
+
+    def connected(self, connection):
+        connection.write("Hee hee\0")
+        connection.setHandler(self)
+
+    __call__ = connected
+
+    handle_input = handle_close = lambda: xxxxx
+
+def async_evil_setup(test):
+
+    # Uncomment the next 2 lines to check that a bunch of lambda type
+    # errors are logged.
+    #import logging
+    #logging.getLogger().addHandler(logging.StreamHandler())
+    
+    # See if we can break the main loop before running the async test
+    
+    # Connect to bad port with bad handler
+
+    port = zc.ngi.wordcount.get_port()
+    addr = 'localhost', port
+    zc.ngi.async.connector(addr, BrokenConnect())
+
+    # Start the server and connect to a good port with a bad handler
+
+    port = zc.ngi.wordcount.start_server_process(zc.ngi.async.listener)
+    addr = 'localhost', port
+    zc.ngi.async.connector(addr, BrokenAfterConnect())
+
+    # Stop the server
+    zc.ngi.wordcount.stop_server_process(zc.ngi.async.connector, addr)
+
+    # Create a lister with a broken server and connect to it
+    port = zc.ngi.wordcount.get_port()
+    addr = 'localhost', port
+    zc.ngi.async.listener(addr, BrokenConnect())
+    zc.ngi.async.connector(addr, BrokenAfterConnect())
+
+    # Create a lister with a broken Server handler and connect to it
+    port = zc.ngi.wordcount.get_port()
+    addr = 'localhost', port
+    zc.ngi.async.listener(addr, BrokenAfterConnect())
+    zc.ngi.async.connector(addr, BrokenAfterConnect())
+
+    
 def test_suite():
     return unittest.TestSuite([
         doctest.DocFileSuite(
             'README.txt',
             'message.txt',
-            'async.txt',
             'adapters.txt',
+            ),
+        doctest.DocFileSuite(
+            'async.txt',
+            setUp=async_evil_setup,
             ),
         doctest.DocTestSuite(),
         ])

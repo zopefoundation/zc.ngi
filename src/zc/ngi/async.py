@@ -31,6 +31,7 @@ import zc.ngi
 pid = os.getpid()
 
 _map = {}
+_connectors = {}
 
 expected_socket_read_errors = {
     errno.EWOULDBLOCK: 0,
@@ -47,14 +48,18 @@ expected_socket_write_errors = {
 
 class dispatcher(asyncore.dispatcher):
 
-    def __init__(self, sock, addr):
+    def __init__(self, sock, addr, map=_map):
         self.addr = addr
-        asyncore.dispatcher.__init__(self, sock, _map)
+        asyncore.dispatcher.__init__(self, sock, map)
 
     def handle_error(self):
         reason = sys.exc_info()[1]
         self.logger.exception('handle_error')
-        self.handle_close(reason)
+        try:
+            self.handle_close(reason)
+        except:
+            self.logger.exception("Exception raised by handle_close(%r)",
+                                  reason)
         self.close()
 
     def close(self):
@@ -199,16 +204,19 @@ class connector(dispatcher):
         else:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-        if __debug__:
-            self.logger.debug('connecting to %s', addr)
-        dispatcher.__init__(self, sock, addr)
-        try:
-            if self.handle_write_event():
-                return
-        except:
-            self.handle_error()
+        dispatcher.__init__(self, sock, addr, _connectors)
 
         notify_select()
+
+    def connect(self):
+        if __debug__:
+            self.logger.debug('connecting to %s', self.addr)
+
+        self.add_channel(_map)
+        try:
+            self.handle_write_event()
+        except:
+            self.handle_error()
 
     def readable(self):
         return False
@@ -236,14 +244,20 @@ class connector(dispatcher):
         self.del_channel(_map)
         if __debug__:
             self.logger.debug('outgoing connected %r', self.addr)
-        self.__handler.connected(
-            _Connection(self.socket, self.addr, self.logger))
+
+        connection = _Connection(self.socket, self.addr, self.logger)
+        self.__handler.connected(connection)
         return
 
     def handle_error(self):
         reason = sys.exc_info()[1]
         self.logger.exception('connect error')
-        self.__handler.failed_connect(reason)
+        try:
+            self.__handler.failed_connect(reason)
+        except:
+            self.logger.exception(
+                "Handler failed_connect(%s) raised an exception", reason,
+                )
         self.close()
 
     def handle_expt(self):
@@ -300,7 +314,7 @@ class listener(asyncore.dispatcher):
         self.del_channel(_map)
         self.socket.close()
         if handler is None:
-            for c in list(self._connections):
+            for c in list(self.__connections):
                 c.handle_close("stopped")
         elif not self.__connections:
             handler(self)
@@ -438,6 +452,7 @@ notify_select = _trigger.pull_trigger
 def loop():
     timeout = 30.0
     map = _map
+    connectors = _connectors
     if hasattr(select, 'poll'):
         poll_fun = asyncore.poll3
     else:
@@ -446,6 +461,10 @@ def loop():
     logger = logging.getLogger('zc.ngi.async.loop')
 
     while map:
+        for f in list(connectors):
+            c = connectors.pop(f)
+            c.connect()
+            
         try:
             poll_fun(timeout, map)
         except:
