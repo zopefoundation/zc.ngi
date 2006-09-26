@@ -40,10 +40,14 @@ logger = logging.getLogger('zc.ngi.wordcount')
 class Server:
     
     def __init__(self, connection):
+        if __debug__:
+            logger.debug("Server(%r)", connection)
         self.input = ''
         connection.setHandler(self)
 
     def handle_input(self, connection, data):
+        if __debug__:
+            logger.debug("server handle_input(%r, %r)", connection, data)
         self.input += data
         while '\0' in self.input:
             data, self.input = self.input.split('\0', 1)
@@ -59,11 +63,14 @@ class Server:
             connection.write("%s %s %s\n" % (lc, wc, cc))
 
     def handle_close(self, connection, reason):
-        pass
+        if __debug__:
+            logger.debug("server handle_close(%r, %r)", connection, reason)
 
 def serve():
-    mod, name, port = sys.argv[1:]
+    mod, name, port, level = sys.argv[1:]
     __import__(mod)
+    logger.setLevel(int(level))
+    logger.addHandler(logging.StreamHandler())
     logger.info('serving')
     getattr(sys.modules[mod], name)(('localhost', int(port)), Server)
     run()
@@ -121,7 +128,8 @@ def start_server_process(listener):
         PYTHONPATH=os.pathsep.join(sys.path),
         )
     os.spawnle(os.P_NOWAIT, sys.executable, sys.executable, __file__,
-               module, name, str(port), env)
+               module, name, str(port), str(logger.getEffectiveLevel()),
+               env)
     addr = 'localhost', port
     wait(addr)
     return port
@@ -156,13 +164,18 @@ class Client:
         self.input = ''
 
     def connected(self, connection):
+        if __debug__:
+            logger.debug("connected(%r)", connection)
         connection.write(self.docs[0]+'\0')
         connection.setHandler(self)
         
     def failed_connect(self, reason):
         print 'Failed to connect:', reason
+        self.notify()
 
     def handle_input(self, connection, data):
+        if __debug__:
+            logger.debug("client handle_input(%r, %r)", connection, data)
         self.input += data
         if '\n' in self.input:
             data, self.input = self.input.split('\n', 1)
@@ -181,6 +194,8 @@ class Client:
                     self.notify()
 
     def handle_close(self, connection, reason):
+        if __debug__:
+            logger.debug("client handle_close(%r, %r)", connection, reason)
         if self.docs:
             print 'unexpected close', reason
 
