@@ -32,7 +32,7 @@ def test_async_cannot_connect():
 
     >>> class Handler:
     ...     def failed_connect(connection, reason):
-    ...         print 'failed', reason
+    ...         print 'failed'
     ...         lock.release()
 
     >>> def connect(addr):
@@ -47,7 +47,7 @@ def test_async_cannot_connect():
     Now let's try to connect
 
     >>> connect(('localhost', port))
-    failed connection failed
+    failed
     
     """
 
