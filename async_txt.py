@@ -16,6 +16,7 @@ logging.getLogger().setLevel(logging.WARNING)
 
 import zc.ngi.wordcount
 import zc.ngi.async
+import zc.ngi.testing
 port = zc.ngi.wordcount.start_server_process(zc.ngi.async.listener)
 
 ## We passed the module and name of the listener to be used.
@@ -34,3 +35,30 @@ _ = [thread.start() for thread in threads]
 _ = [thread.join() for thread in threads]
 
 zc.ngi.wordcount.stop_server_process(zc.ngi.async.connector, addr)
+
+## Let's make sure that the connector handles connection failures correctly
+
+import threading
+lock = threading.Lock()
+_ = lock.acquire()
+
+##     We define a simple handler that just notifies of failed connectioons.
+
+class Handler:
+    def failed_connect(connection, reason):
+        print 'failed', reason
+        lock.release()
+
+def connect(addr):
+    zc.ngi.async.connector(addr, Handler())
+    lock.acquire()
+
+##     We find an unused port (so when we connect to it, the connection
+##     will fail).
+
+port = zc.ngi.testing.get_port()
+
+##     Now let's try to connect
+
+connect(('localhost', port))
+##     failed connection failed
