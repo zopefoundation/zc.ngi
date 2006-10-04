@@ -348,6 +348,18 @@ characters in length, it is wrapped by simply breakng the repr into
     .> lo hello hello hello hello hello hello hello hello
     .>  '
 
+Text output
+===========
+
+If the output from an application consists of short lines of text, a
+TextConnection can be used.  A TextConnection simply outputs it's data
+directly.
+
+    >>> connection = zc.ngi.testing.TextConnection()
+    >>> connection.write('hello\nworld\n')
+    hello
+    world
+
 END_OF_DATA
 ===========
 

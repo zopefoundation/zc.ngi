@@ -91,6 +91,18 @@ class Connection:
             return self.close()
         self.peer.test_input(data)
 
+class TextPrintingHandler(PrintingHandler):
+
+    def handle_input(self, connection, data):
+        print data,
+
+class TextConnection(Connection):
+
+    control = None
+
+    def __init__(self, peer=None, handler=TextPrintingHandler):
+        Connection.__init__(self, peer, handler)
+
 _connectable = {}
 
 def connector(addr, handler):
