@@ -3,12 +3,12 @@ Network Gateway Interface
 =========================
 
 Network programs are typically difficult to test because they require
-setting up network connections, clientts, and servers.  In addition,
+setting up network connections, clients, and servers.  In addition,
 application code gets mixed up with networking code.
 
 The Network Gateway Interface (NGI) seeks to improve this situation by
 separating application code from network code.  This allows
-application and network code to be tested indepenndly and provides
+application and network code to be tested independently and provides
 greater separation of concerns.
 
 There are several interfaces defined by the NGI:
@@ -24,7 +24,7 @@ IConnector
     Create IConnection objects by making outgoing connections.
 
 IClientConnectHandler
-    Application callback that handles successful ot failed outgoing
+    Application callback that handles successful or failed outgoing
     connections.
 
 IListener
@@ -50,7 +50,7 @@ application code.
     >>> import zc.ngi.testing
 
 The testing module provides IConnection, IConnector, and IListener
-implentations. We'll use this below to illustrate how application code
+implementations. We'll use this below to illustrate how application code
 is written.
 
 Implementing Network Clients
@@ -58,7 +58,7 @@ Implementing Network Clients
 
 Network clients make connections to and then use these connections to
 communicate with servers.  To do so, a client must be provided with an
-IConnector implemantation.  How this happens is outside the scope of
+IConnector implantation.  How this happens is outside the scope of
 the NGI.  An IConnector implementation could, for example, be provided
 via the Zope component architecture, or via pkg_resources entry
 points.
@@ -106,8 +106,8 @@ that the server properly echoes data sent do it.
     ...             print 'closed prematurely'    
 
 
-The client impements the IClientConnectHandler and IInputHandler
-interfaces.  More complex clients might implement these interfacs with
+The client implements the IClientConnectHandler and IInputHandler
+interfaces.  More complex clients might implement these interfaces with
 separate classes.
 
 We'll instantiate our client using the testing connector:
@@ -120,12 +120,12 @@ Now we'll try to check a non-existent server:
     failed connect: no such server
 
 Our client simply prints a message (and gives up) if a connection
-fails. More complex applications might retry, waiting between attemps,
+fails. More complex applications might retry, waiting between attempts,
 and so on.
 
 The testing connector always fails unless given a test connection
 ahead of time.  We'll create a testing connection and register it so a
-connection can suceed:
+connection can succeed:
 
     >>> connection = zc.ngi.testing.Connection()
     >>> zc.ngi.testing.connectable(('localhost', 42), connection)
@@ -145,14 +145,14 @@ created:
     -> 'world\n'
     -> 'how are you?\n'
 
-The test connection echoes data written to it, preceeded by "-> ".
+The test connection echoes data written to it, preceded by "-> ".
 
 Active connections are true:
 
     >>> bool(connection2)
     True
 
-Test connections provide mehods generating test input and flow closing
+Test connections provide methods generating test input and flow closing
 connections.  We can use these to simulate network events.  Let's
 generate some input for our client:
 
@@ -335,7 +335,7 @@ Long output
 ===========
 
 Test requests output data written to them.  If output exceeds 50
-characters in length, it is wrapped by simply breakng the repr into 
+characters in length, it is wrapped by simply breaking the repr into 
 50-characters parts:
 
     >>> connection = zc.ngi.testing.Connection()
