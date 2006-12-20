@@ -3,9 +3,9 @@ NGI Adapters
 ============
 
 The NGI is a fairly low-level event-based framework.  Adapters can be
-used to build higher-level sematics.  In this document, we'll describe
+used to build higher-level semantics.  In this document, we'll describe
 some sample adapters that provide more examples of using the NGI and
-useful building blocks for other applications. The sound for these
+useful building blocks for other applications. The source for these
 adapters can be found in the zc.ngi.adapters module.
 
 Lines
@@ -48,7 +48,7 @@ Now, when we provide input, it won't appear until lines are complete:
     -> 'World!'
 
 Only input handling is affected.  Other methods of the adapter behave
-as would the underlying connnection:
+as would the underlying connection:
 
     >>> adapter.write('foo')
     -> 'foo'
@@ -90,7 +90,7 @@ calling struct pack:
 
 Here we saw that our handler got the two messages individually.
 
-If we write a message, we can see that the message is preceeded by the
+If we write a message, we can see that the message is preceded by the
 message size:
 
     >>> adapter.write(message1) 
@@ -101,7 +101,7 @@ Null messages
 -------------
 
 It can be useful to send Null messages to make sure that a client is
-still connected.  The sized adapter supprts such messages.  Calling
+still connected.  The sized adapter supports such messages.  Calling
 write with None, sends a null message, which is a message with a
 length of 1 << 32 - 1 and no message data:
 

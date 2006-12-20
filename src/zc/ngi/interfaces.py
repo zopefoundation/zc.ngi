@@ -22,7 +22,7 @@ The NGI is an event-based framework in the sense that applications
 register handlers that respond to input events.  There are 3 kinds of
 handlers:
 
-- Input handlers recieve network input
+- Input handlers receive network input
 
 - Client-connect handlers respond to outbound connection events, and
 
@@ -31,8 +31,8 @@ handlers:
 The interfaces are designed to allow single-threaded applications:
 
 - An implementation of the interfaces is not allowed to make multiple
-  simultanious calls to the same application handler.  (Note that this
-  requirement does not extend accross multiple implementations.
+  simultaneous calls to the same application handler.  (Note that this
+  requirement does not extend across multiple implementations.
   Theoretically, different implementations could call handlers at the
   same time.
 
@@ -67,7 +67,7 @@ class IConnection(Interface):
     def setHandler(handler):
         """Set the IConnectionHandler for a connection.
 
-        This methid can only be called in direct response to an
+        This method can only be called in direct response to an
         implementation call to a IConnectionHandler,
         IClientConnectHandler, or IServer
         """
@@ -90,7 +90,7 @@ class IInputHandler(Interface):
     """Objects that can handle connection input-data events
 
     The methods defined be this interface will never be called
-    simultaniously from separate threads, so implementation of the
+    simultaneously from separate threads, so implementation of the
     methods needn't be concerned with thread safety with respect to
     these methods.
     """
@@ -100,15 +100,15 @@ class IInputHandler(Interface):
         
         The data is an 8-bit string.
 
-        Note that there are no promises about blocking.  There data
+        Note that there are no promises about blocking.  The data
         isn't necessarily record oriented.  For example, data could,
-        in theory be passed one character at a time.  It os up to
+        in theory be passed one character at a time.  It is up to
         applications to organize data into records, if desired.
         
         """
 
     def handle_close(connection, reason):
-        """Recieve notification that a connection has closed
+        """Receive notification that a connection has closed
         
         The reason argument can be converted to a string for logging
         purposes.  It may have data useful for debugging, but this
@@ -130,20 +130,20 @@ class IConnector(Interface):
         
         The handler is an IClientConnectHandler.  The handler
         connected method will be called with an IConnection object
-        if and when the connection suceeds or failed_connect method
+        if and when the connection succeeds or failed_connect method
         will be called if the connection fails.
         """
 
 class IClientConnectHandler(Interface):
-    """Recieve notifications of connection results
+    """Receive notifications of connection results
     """
 
     def connected(connection):
-        """Recieve notification that a connection had been established
+        """Receive notification that a connection had been established
         """
         
     def failed_connect(reason):
-        """Recieve notificantion that a connection could not be established
+        """Receive notification that a connection could not be established
 
         The reason argument can be converted to a string for logging
         purposes.  It may have data useful for debugging, but this
@@ -157,7 +157,7 @@ class IListener(Interface):
     def __call__(address, handler):
         """Listen for incoming connections
 
-        When a connection is recieved, call the handler.
+        When a connection is received, call the handler.
 
         An IServerControl object is returned.
         """
@@ -179,9 +179,9 @@ class IServerControl(Interface):
         """
 
     def close(handler=None):
-        """Close the listener and all of it's connections
+        """Close the listener and all of its connections
 
-        If no handler is passed, the listener and it's connections
+        If no handler is passed, the listener and its connections
         are closed immediately without waiting for any pending input
         to be handled or for pending output to be sent.
 

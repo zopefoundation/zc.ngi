@@ -28,7 +28,7 @@ IClientConnectHandler
     connections.
 
 IListener
-    Listed for incoming connections.
+    Listen for incoming connections.
 
 IServer
     Callback to handle incoming connections.
