@@ -1,2 +1,9 @@
-- Need to change the async implementation to allow setHandler to be
-  called multiple times, but only from the main thread.
+- Test for blocking where there is some i/o before timeout.
+
+- Test for blocking where there is some i/o before success.
+
+- Test blocking timout on writelines and non-blocking option
+
+- Test handle_exception for blocking
+
+- Test we fail early when passing non-iterable to writelines

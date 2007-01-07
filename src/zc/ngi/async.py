@@ -77,8 +77,8 @@ class _Connection(dispatcher):
         self.__connected = True
         self.__closed = None
         self.__handler = None
+        self.__exception = None
         self.__output = []
-        self.__handler_lock = threading.Lock()
         dispatcher.__init__(self, sock, addr)
         self.logger = logger
 
@@ -89,22 +89,31 @@ class _Connection(dispatcher):
         if self.__handler is not None:
             raise TypeError("Handler already set")
 
-        self.__handler_lock.acquire()
-        try:
-            self.__handler = handler
-            if self.__closed:
-                handler.handle_close(seld, self.__closed)
-        finally:
-            self.__handler_lock.release()
+        self.__handler = handler
+        if self.__exception:
+            exception = self.__exception
+            self.__exception = None
+            handler.handle_exception(self, exception)
+        if self.__closed:
+            handler.handle_close(self, self.__closed)
         
     def write(self, data):
         if __debug__:
             self.logger.debug('write %r', data)
+        assert isinstance(data, str) or (data is zc.ngi.END_OF_DATA)
         self.__output.append(data)
+        notify_select()
+        
+    def writelines(self, data):
+        if __debug__:
+            self.logger.debug('writelines %r', data)
+        assert not isinstance(data, str), "writelines does not accept strings"
+        self.__output.append(iter(data))
         notify_select()
 
     def close(self):
         self.__connected = False
+        self.__output[:] = []
         dispatcher.close(self)
         if self.control is not None:
             self.control.closed(self)
@@ -143,15 +152,38 @@ class _Connection(dispatcher):
         while self.__output:
             output = self.__output
             v = output[0]
-            if v == zc.ngi.END_OF_DATA:
+            if v is zc.ngi.END_OF_DATA:
                 self.close()
                 return
             
+            if not isinstance(v, str):
+                # Must be an iterator
+                try:
+                    v = v.next()
+                except StopIteration:
+                    # all done
+                    output.pop(0)
+                    continue
+                
+                if __debug__ and not isinstance(v, str):
+                    exc = TypeError("iterable output returned a non-string", v)
+                    self.__report_exception(exc)
+                    raise exc
+
+                output.insert(0, v)
+
+            if not v:
+                output.pop(0)
+                continue
+
             try:
                 n = self.send(v)
             except socket.error, err:
                 if err[0] in expected_socket_write_errors:
                     return # we couldn't write anything
+                raise
+            except Exception, v:
+                self.__report_exception(v)
                 raise
             
             if n == len(v):
@@ -159,19 +191,21 @@ class _Connection(dispatcher):
             else:
                 output[0] = v[n:]
                 return # can't send any more
+
+    def __report_exception(self, exception):
+        if self.__handler is not None:
+            self.__handler.handle_exception(self, exception)
+        else:
+            self.__exception = exception
             
     def handle_close(self, reason='end of input'):
         if __debug__:
             self.logger.debug('close %r', reason)
-        self.__handler_lock.acquire()
-        try:
-            if self.__handler is not None:
-                self.__handler.handle_close(self, reason)
-            else:
-                self.__closed = reason
-            self.close()
-        finally:
-            self.__handler_lock.release()
+        if self.__handler is not None:
+            self.__handler.handle_close(self, reason)
+        else:
+            self.__closed = reason
+        self.close()
 
     def handle_expt(self):
         self.handle_close('socket error')

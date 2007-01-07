@@ -34,15 +34,15 @@ The interfaces are designed to allow single-threaded applications:
   simultaneous calls to the same application handler.  (Note that this
   requirement does not extend across multiple implementations.
   Theoretically, different implementations could call handlers at the
-  same time.
+  same time.)
 
 - All handler calls that are associated with a connection include the
   connection as a parameter,  This allows a single handler object to
   respond to events from multiple connections.
 
 Applications may be multi-threaded.  This means that implementations
-must be thread safe.  This means that calls into the implementation
-could be made at any time.
+must be thread safe.  This means that, unless otherwise stated, calls
+into the implementation could be made at any time.
 
 $Id$
 """
@@ -51,6 +51,8 @@ from zope.interface import Interface, Attribute
 
 class IConnection(Interface):
     """Network connections
+
+    This is an implementation interface.
   
     Network connections support communication over a network
     connection, or any connection having separate input and output
@@ -73,9 +75,16 @@ class IConnection(Interface):
         """
 
     def write(data):
-        """Write output data to a connection.
+        """Output a string to the connection.
         
         The write call is non-blocking.
+        """
+
+    def writelines(data):
+        """Output an iterable of strings to the connection.
+        
+        The writelines call is non-blocking. Note, that the data may
+        not have been consumed when the method returns.        
         """
 
     def close():
@@ -83,11 +92,17 @@ class IConnection(Interface):
         """
 
 class IServerConnection(IConnection):
-
+    """Server connection
+    
+    This is an implementation interface.
+    """
+    
     control = Attribute("An IServerControl")
 
-class IInputHandler(Interface):
-    """Objects that can handle connection input-data events
+class IConnectionHandler(Interface):
+    """Application objects that can handle connection input-data events
+
+    This is an application interface.
 
     The methods defined be this interface will never be called
     simultaneously from separate threads, so implementation of the
@@ -121,8 +136,19 @@ class IInputHandler(Interface):
         called.      
         """
 
+    def handle_exception(connection, exception):
+        """Recieve a report of an exception encountered by a connection
+
+        This method is used to recieve exceptions from an NGI
+        implementation.  Typically, this will be due to an error
+        encounted processing data passed to the connection write or
+        writelines methods.
+        """
+
 class IConnector(Interface):
     """Create a connection to a server
+    
+    This is an implementation interface.
     """
 
     def __call__(address, handler):
@@ -136,6 +162,8 @@ class IConnector(Interface):
 
 class IClientConnectHandler(Interface):
     """Receive notifications of connection results
+
+    This is an application interface.
     """
 
     def connected(connection):
@@ -152,6 +180,8 @@ class IClientConnectHandler(Interface):
 
 class IListener(Interface):
     """Listed for incoming connections
+    
+    This is an implementation interface.
     """
 
     def __call__(address, handler):
@@ -164,6 +194,8 @@ class IListener(Interface):
 
 class IServer(Interface):
     """Handle server connections
+
+    This is an application interface.
     """
 
     def __call__(connection):
@@ -172,6 +204,8 @@ class IServer(Interface):
 
 class IServerControl(Interface):
     """Server information and close control
+    
+    This is an implementation interface.
     """
 
     def connections():
@@ -189,4 +223,146 @@ class IServerControl(Interface):
         connections and existing connections will be left open.  The
         handler will be called when all of the existing connections
         have been closed.
+        """
+
+class IBlocking(Interface):
+    """Top-level blocking interface provided by the blocking module
+    """
+
+    def connect(address, connector, timeout=None):
+        """Connect to the given address using the given connector
+
+        A timout value may be given as a floating point number of
+        seconds.
+
+        If connection suceeds, an IConnection is returned, otherwise
+        an exception is raised.
+        """
+
+    def open(connection_or_address, connector=None, timeout=None):
+        """Get output and input files for a connection or address
+
+        The first argument is either a connection or an address.
+        If (and only if) it is an address, then a connector must be
+        provided as the second argument and a connection is gotten by
+        calling the connect function with the given address,
+        connector, and timeout.
+
+        A pair of file-like objects is returned. The first is an
+        output file-like object, an IBlockingOutput, for sending
+        output to the connection.  The second file-like object is an
+        input file-like object, an IBlockingInput, for reading data
+        from the connection.
+        """
+
+class IBlockingPositionable(Interface):
+    """File-like objects with file positions.
+
+    To mimic file objects, working seek and tell methods are provided
+    that report and manipulate pseudo file positions.  The file
+    position starts at zero and is advanced by reading or writing
+    data. It can be adjusted (pointlessly) by the seek method.
+    """
+
+    def tell():
+        """Return the current file position.
+        """
+
+    def seek(offset, whence=0):
+        """Reset the file position
+
+        If whence is 0, then the file position is set to the offset.
+
+        If whence is 1, the position is increased by the offset.
+
+        If whence is 2, the position is decreased by the offset.
+
+        An exception is raised if the position is set to a negative
+        value. 
+        """
+
+    def close():
+        """Close the connection.
+        """
+
+class IBlockingOutput(IBlockingPositionable):
+    """A file-like object for sending output to a connection.
+    """
+
+    def flush():
+        """Do nothing.
+        """
+
+    def write(data):
+        """Write a string to the connection.
+
+        The function will return immediately.  The data may be queued.
+        """
+
+    def writelines(iterable, timeout=0, nonblocking=False):
+        """Write an iterable of strings to the connection.
+
+        By default, the call will block until the data from the
+        iterable has been consumed.  If a true value is passed to the
+        non-blocking keyword argument, then the function will return
+        immediately. The iterable will be consumed at some later time.
+
+        In (the default) blocking mode, a timeout may be provided to
+        limit the time that the call will block.  If the timeout
+        expires, a zc.ngi.blocking.Timeout excation will be raised.
+        """
+
+class IBlockingInput(IBlockingPositionable):
+    """A file-like object for reading input from a connection.
+    """
+
+    def read(size=None, timeout=None):
+        """Read data
+
+        If a size is specified, then that many characters are read,
+        blocking of necessary.  If no size is specified (or if size is
+        None), then all remaining input data are read.
+
+        A timeout may be specified as a floating point number of
+        seconds to wait.  A zc.ngi.blocking.Timeout exception will be
+        raised if the data cannot be read in the number of seconds given.
+        """
+
+    def readline(size=None, timeout=None):
+        """Read a line of data
+
+        If a size is specified, then the lesser of that many
+        characters or a single line of data are read, blocking of
+        necessary.  If no size is specified (or if size is None), then
+        a single line are read.
+
+        A timeout may be specified as a floating point number of
+        seconds to wait.  A zc.ngi.blocking.Timeout exception will be
+        raised if the data cannot be read in the number of seconds given.
+        """
+
+    def readlines(sizehint=None, timeout=None):
+        """Read multiple lines of data
+
+        If a sizehint is specified, then one or more lines of data are
+        returned whose total length is less than or equal to the size
+        hint, blocking if necessary. If no sizehint is specified (or
+        if sizehint is None), then the remainder of input, split into
+        lines, is returned.
+
+        A timeout may be specified as a floating point number of
+        seconds to wait.  A zc.ngi.blocking.Timeout exception will be
+        raised if the data cannot be read in the number of seconds given.
+        """
+
+        
+
+    def __iter__():
+        """Return the input object
+        """
+
+    def next():
+        """Return a line of input
+
+        Raises StopIteration if there is no more input.
         """

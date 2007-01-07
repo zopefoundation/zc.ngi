@@ -56,6 +56,9 @@ class Server:
                 connection.write(zc.ngi.END_OF_DATA)
                 connection.control.close(lambda c: 1)
                 return
+            elif data == 'C':
+                connection.write(zc.ngi.END_OF_DATA)
+                return
             else:
                 cc = len(data)
                 lc = len(data.split('\n'))-1

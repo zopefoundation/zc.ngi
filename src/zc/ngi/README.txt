@@ -103,10 +103,13 @@ that the server properly echoes data sent do it.
     ...     def handle_close(self, connection, reason):
     ...         print 'closed:', reason
     ...         if self.strings:
-    ...             print 'closed prematurely'    
+    ...             print 'closed prematurely'
+    ...
+    ...     def handle_exception(self, connection, exception):
+    ...         print 'exception:', exception.__class__.__name__, exception
 
 
-The client implements the IClientConnectHandler and IInputHandler
+The client implements the IClientConnectHandler and IConnectionHandler
 interfaces.  More complex clients might implement these interfaces with
 separate classes.
 
@@ -178,7 +181,31 @@ generate some input for our client:
 
     >>> bool(connection2)
     False
-    
+
+Passing iterables to connections
+================================
+
+The writelines method of IConnection accepts iterables of strings.
+
+    >>> def greet():
+    ...     yield 'hello\n'
+    ...     yield 'world\n'
+
+    >>> zc.ngi.testing.Connection().writelines(greet())
+    -> 'hello\n'
+    -> 'world\n'
+
+If there is an error in your iterator, or if the iterator returns
+a non-string value, an exception will be reported using
+handle_exception:
+
+    >>> def bad():
+    ...     yield 2
+    >>> connection = zc.ngi.testing.Connection()
+    >>> connection.setHandler(zc.ngi.testing.PrintingHandler(connection))
+    >>> connection.writelines(bad())
+    -> EXCEPTION TypeError Got a non-string result from iterable
+
 
 Implementing network servers
 ============================

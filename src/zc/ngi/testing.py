@@ -37,6 +37,9 @@ class PrintingHandler:
         else:
             print '-> CLOSE'
 
+    def handle_exception(self, connection, exception):
+        print '-> EXCEPTION', exception.__class__.__name__, exception
+
 class Connection:
 
     control = None
@@ -45,6 +48,7 @@ class Connection:
         self.handler = None
         self.closed = False
         self.input = ''
+        self.exception = None
         if peer is None:
             peer = Connection(self)
             handler(peer)
@@ -64,6 +68,10 @@ class Connection:
         
     def setHandler(self, handler):
         self.handler = handler
+        if self.exception:
+            exception = self.exception
+            self.exception = None
+            handler.handle_exception(self, exception)
         if self.input:
             handler.handle_input(self, self.input)
             self.input = ''
@@ -89,7 +97,28 @@ class Connection:
     def write(self, data):
         if data is zc.ngi.END_OF_DATA:
             return self.close()
-        self.peer.test_input(data)
+
+        if isinstance(data, str):
+            self.peer.test_input(data)
+        else:
+            raise TypeError("write argument must be a string")
+
+    def writelines(self, data):
+        assert not (isinstance(data, str) or (data is zc.ngi.END_OF_DATA))
+        data = iter(data)
+        try:
+            for d in data:
+                if not isinstance(d, str):
+                    raise TypeError("Got a non-string result from iterable")
+                self.write(d)
+        except Exception, v:
+            self._exception(v)
+
+    def _exception(self, exception):
+        if self.handler is None:
+            self.exception = exception
+        else:
+            self.handler.handle_exception(self, exception)
 
 class TextPrintingHandler(PrintingHandler):
 

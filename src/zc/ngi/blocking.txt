@@ -1,0 +1,156 @@
+=======================
+Blocking network access
+=======================
+
+The NGI normally uses an event-based networking model in which
+application code reactes to incoming data.  That model works well for
+some applications, especially server applications, but can be a bit of
+a bother for simpler applications, especially client applications.
+
+The zc.ngi.blocking module provides a simple blocking network model.
+The open function can be used to create a pair of file-like objects
+that can be used for writing output and reading input.  To illustrate
+this, we'll use the wordcount server.  We'll use the peer function to
+create a testing connector that connects to the server directory
+without using a network:
+
+    >>> import zc.ngi.wordcount
+    >>> import zc.ngi.testing
+    >>> connector = zc.ngi.testing.peer(('localhost', 42),
+    ...                                 zc.ngi.wordcount.Server)
+    
+The open function is called with an address and a connector:
+    
+    >>> import zc.ngi.blocking
+    >>> output, input = zc.ngi.blocking.open(('localhost', 42), connector)
+    
+The output file lets us send output to the server:
+
+    >>> output.write("Hello\n")
+    >>> output.write("world\n")
+    >>> output.write("\0")
+
+The wordcount server accepts a sequence of text from the
+client. Delimited by null characters.  For each input text, it
+generates a line of summary statistics:
+
+    >>> input.readline()
+    '2 2 12\n'
+
+We can use the writelines method to send data using an iterator:
+
+    >>> def hello(name):
+    ...     yield "hello\n"
+    ...     yield name
+    ...     yield "\0"
+
+    >>> output.writelines(hello("everyone"))
+    >>> output.writelines(hello("bob"))
+
+ To close the connection to the server, we'll send a close command,
+ which is a documenty consisting of the letter "C":
+
+    >>> output.write("C\0")
+
+This causes the server to close the connection after it has sent it's
+data.
+
+We can use the read function to read either a fixed number of bytes
+from the server:
+
+    >>> input.read(5)
+    '1 2 1'
+
+Or to read the remaining data:
+
+    >>> input.read()
+    '4\n1 2 9\n'
+
+If read is called without a size, it won't return until the server has
+closed the connection.  
+
+In this example, we've been careful to only read as much data as the
+server produces.  For example, we called read without passing a length
+only after sending a quit command to the server.  When using the
+blocking library, care is needed to avoid a deadlock, in which both
+sides of a connection are waiting for input.
+
+The blocking open and input methods accept an optional timeout
+argument.  The timeout argument accepts a floating-point time-out
+value, in seconds.  If a connection or input operation times out, a
+Timeout exception is raised:
+
+    >>> output, input = zc.ngi.blocking.open(('localhost', 42), connector)
+    >>> import time
+    >>> then = time.time()
+    >>> input.read(5, timeout=0.5)
+    Traceback (most recent call last):
+    ...
+    Timeout
+
+    >>> 0.5 < (time.time() - then) < 1
+    True
+
+The readline and readlines functions accept a timeout as well:
+
+    >>> then = time.time()
+    >>> input.readline(timeout=0.5)
+    Traceback (most recent call last):
+    ...
+    Timeout
+
+    >>> 0.5 < (time.time() - then) < 1
+    True
+
+    >>> then = time.time()
+    >>> input.readlines(timeout=0.5)
+    Traceback (most recent call last):
+    ...
+    Timeout
+
+    >>> 0.5 < (time.time() - then) < 1
+    True
+
+Timeouts can also be specified when connecting. To illustrate this,
+we'll pass a do-nothing connector:
+
+    >>> then = time.time()
+    >>> zc.ngi.blocking.open(None, (lambda *args: None), timeout=0.5)
+    Traceback (most recent call last):
+    ...
+    ConnectionTimeout
+
+    >>> 0.5 < (time.time() - then) < 1
+    True
+
+Low-level connection management
+===============================
+
+When we used open above, we passed an address and a connector, and the
+oprn function created a connection and created file-like objects for
+output and input.  The connect function can be used to create a
+connection without a file-like object:
+
+    >>> connection = zc.ngi.blocking.connect(('localhost', 42), connector)
+
+The if the open function is called without a connector, the the first
+object must be a connection object and output and input objects for
+that connection will be returned:
+
+    >>> output, input = zc.ngi.blocking.open(connection)
+    >>> output.write("Hello\n")
+    >>> output.write("world\n")
+    >>> output.write("\0")
+    >>> input.readline()
+    '2 2 12\n'
+
+Like the open function, the connect function accepts a timeout:
+
+    >>> then = time.time()
+    >>> zc.ngi.blocking.connect(None, (lambda *args: None), timeout=0.5)
+    Traceback (most recent call last):
+    ...
+    ConnectionTimeout
+
+    >>> 0.5 < (time.time() - then) < 1
+    True

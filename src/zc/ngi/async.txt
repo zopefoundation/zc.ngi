@@ -32,7 +32,7 @@ Let's start the wordcount server:
     >>> import zc.ngi.async
     >>> port = zc.ngi.wordcount.start_server_process(zc.ngi.async.listener)
 
-We passed the module and name of the listener to be used.
+We passed the listener to be used.
 
 Now, we'll start a number of threads that connect to the server and
 check word counts of some sample documents.  If all goes well, we
@@ -47,4 +47,56 @@ shouldn't get any output.
     >>> _ = [thread.start() for thread in threads]
     >>> _ = [thread.join() for thread in threads]
     
+Iterable input
+==============
+
+We can pass data to the server using an iterator.  To illustrate this,
+we'll use the blocking interface:
+
+    >>> import zc.ngi.blocking
+    >>> output, input = zc.ngi.blocking.open(addr, zc.ngi.async.connector,
+    ...                                      timeout=1.0)
+    >>> def hello(name):
+    ...     yield "hello\n"
+    ...     yield name
+    ...     yield "\0"
+    
+    >>> output.writelines(hello('world'), timeout=1.0)
+    >>> input.readline(timeout=1.0)
+    '1 2 11\n'
+
+.. Error handling:
+
+   If we pass a non-iterable to writelines, we'll get an immediate
+   error.  To demonstrate this we'll violate out output file and
+   access it's _connection attribute so that we can bypass the check
+   in the blocking writelines method:
+
+    >>> output._connection.writelines(2)
+    Traceback (most recent call last):
+    ...
+    TypeError: iteration over non-sequence
+
+    >>> output._connection.writelines('foo')
+    Traceback (most recent call last):
+    ...
+    AssertionError: writelines does not accept strings
+
+   If we pass an iterable that returns a non-string, we'll get a type
+   error when we try to read because handle_exception is caused ion
+   the input handler.
+
+    >>> output.writelines([2], timeout=0.1)
+    Traceback (most recent call last):
+    ...
+    Timeout
+
+    >>> input.readline()
+    Traceback (most recent call last):
+    ...
+    TypeError: ('iterable output returned a non-string', 2)
+
+
+.. stop the server
+
     >>> zc.ngi.wordcount.stop_server_process(zc.ngi.async.connector, addr)

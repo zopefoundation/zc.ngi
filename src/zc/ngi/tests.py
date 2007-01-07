@@ -108,6 +108,7 @@ def test_suite():
             'README.txt',
             'message.txt',
             'adapters.txt',
+            'blocking.txt',
             ),
         doctest.DocFileSuite(
             'async.txt',
