@@ -322,7 +322,12 @@ class listener(asyncore.dispatcher):
             return
 
         try:
-            sock, addr = self.accept()
+            r = self.accept()
+            if r:
+                sock, addr = r
+            else:
+                # didn't get anything. Hm. Ignore.
+                return
         except socket.error, msg:
             self.logger.exception("accepted failed: %s", msg)
             return
