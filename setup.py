@@ -4,17 +4,7 @@ from setuptools import setup, find_packages
 def read(*rnames):
     return open(os.path.join(os.path.dirname(__file__), *rnames)).read()
 
-name = 'zc.ngi'
-setup(
-    name = name,
-    version = "1.0",
-    author = "Jim Fulton",
-    author_email = "jim@zope.com",
-    description = "Network Gateway Interface",
-    license = "ZPL 2.1",
-    keywords = "network",
-    url='http://www.python.org/pypi/'+name,
-    long_description=(
+long_description=(
         read('README.txt')
         + '\n' +
         'Detailed Documentation\n'
@@ -30,7 +20,21 @@ setup(
         + '\n' +
         'Download\n'
         '**********************\n'
-        ),
+        )
+
+open('documentation.txt', 'w').write(long_description)
+
+name = 'zc.ngi'
+setup(
+    name = name,
+    version = "1.0.1",
+    author = "Jim Fulton",
+    author_email = "jim@zope.com",
+    description = "Network Gateway Interface",
+    license = "ZPL 2.1",
+    keywords = "network",
+    url='http://www.python.org/pypi/'+name,
+    long_description=long_description,
 
     packages = find_packages('src'),
     include_package_data = True,
