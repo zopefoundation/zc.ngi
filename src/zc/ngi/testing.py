@@ -16,6 +16,8 @@
 $Id$
 """
 
+import sys
+import traceback
 import zc.ngi
 
 class PrintingHandler:
@@ -57,6 +59,27 @@ class Connection:
     def __nonzero__(self):
         return not self.closed
 
+    queue = None
+    def _callHandler(self, method, *args):
+        if self.queue is None:
+            self.queue = [(method, args)]
+            while self.queue:
+                method, args = self.queue.pop(0)
+                if self.closed and method != 'handle_close':
+                    break
+                try:
+                    getattr(self.handler, method)(self, *args)
+                except:
+                    print "Error test connection calling connection handler:"
+                    traceback.print_exc(file=sys.stdout)
+                    if method != 'handle_close':
+                        self.close()
+                        self.handler.handle_close(self, method+' error')
+                    
+            self.queue = None
+        else:
+            self.queue.append((method, args))
+
     def close(self):
         self.peer.test_close('closed')
         if self.control is not None:
@@ -71,19 +94,19 @@ class Connection:
         if self.exception:
             exception = self.exception
             self.exception = None
-            handler.handle_exception(self, exception)
+            self._callHandler('handle_exception', exception)
         if self.input:
-            handler.handle_input(self, self.input)
+            self._callHandler('handle_input', self.input)
             self.input = ''
 
         # Note is self.closed is True, we self closed and we
         # don't want to call handle_close.
         if self.closed and isinstance(self.closed, str):
-            handler.handle_close(self, self.closed)
+            self._callHandler('handle_close', self.closed)
 
     def test_input(self, data):
         if self.handler is not None:
-            self.handler.handle_input(self, data)
+            self._callHandler('handle_input', data)
         else:
             self.input += data
 
@@ -92,7 +115,7 @@ class Connection:
             self.control.closed(self)
         self.closed = reason
         if self.handler is not None:
-            self.handler.handle_close(self, reason)
+            self._callHandler('handle_close', reason)
 
     def write(self, data):
         if data is zc.ngi.END_OF_DATA:
@@ -118,7 +141,7 @@ class Connection:
         if self.handler is None:
             self.exception = exception
         else:
-            self.handler.handle_exception(self, exception)
+            self._callHandler('handle_exception', exception)
 
 class TextPrintingHandler(PrintingHandler):
 
@@ -175,6 +198,10 @@ class listener:
         self._connections.remove(connection)
         if not self._connections and self._close_handler:
             self._close_handler(self)
+
+    def connector(self, addr, handler):
+        handler.connected(Connection(None, self._handler))
+        
 
 class peer:
 

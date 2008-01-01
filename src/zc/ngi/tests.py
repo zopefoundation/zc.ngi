@@ -106,6 +106,7 @@ def test_suite():
     return unittest.TestSuite([
         doctest.DocFileSuite(
             'README.txt',
+            'testing.test',
             'message.txt',
             'adapters.txt',
             'blocking.txt',

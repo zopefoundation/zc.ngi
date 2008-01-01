@@ -58,9 +58,10 @@ class dispatcher(asyncore.dispatcher):
         try:
             self.handle_close(reason)
         except:
-            self.logger.exception("Exception raised by handle_close(%r)",
-                                  reason)
-        self.close()
+            self.logger.exception(
+                "Exception raised by dispatcher handle_close(%r)",
+                reason)
+            self.close()
 
     def close(self):
         self.del_channel(_map)
@@ -93,9 +94,19 @@ class _Connection(dispatcher):
         if self.__exception:
             exception = self.__exception
             self.__exception = None
-            handler.handle_exception(self, exception)
+            try:
+                handler.handle_exception(self, exception)
+            except:
+                self.logger.exception("handle_exception failed")
+                return self.handle_close("handle_exception failed")
+                
         if self.__closed:
-            handler.handle_close(self, self.__closed)
+            try:
+                handler.handle_close(self, self.__closed)
+            except:
+                self.logger.exception("Exception raised by handle_close(%r)",
+                                      self.__closed)
+                raise
         
     def write(self, data):
         if __debug__:
@@ -141,7 +152,12 @@ class _Connection(dispatcher):
 
             if __debug__:
                 self.logger.debug('input %r', d)
-            self.__handler.handle_input(self, d)
+            try:
+                self.__handler.handle_input(self, d)
+            except:
+                self.logger.exception("handle_input failed")
+                self.handle_close("handle_input failed")
+                
             if len(d) < 8192:
                 break
 
@@ -194,7 +210,11 @@ class _Connection(dispatcher):
 
     def __report_exception(self, exception):
         if self.__handler is not None:
-            self.__handler.handle_exception(self, exception)
+            try:
+                self.__handler.handle_exception(self, exception)
+            except:
+                self.logger.exception("handle_exception failed")
+                self.handle_close("handle_exception failed")
         else:
             self.__exception = exception
             
@@ -202,7 +222,11 @@ class _Connection(dispatcher):
         if __debug__:
             self.logger.debug('close %r', reason)
         if self.__handler is not None:
-            self.__handler.handle_close(self, reason)
+            try:
+                self.__handler.handle_close(self, reason)
+            except:
+                self.logger.exception("Exception raised by handle_close(%r)",
+                                      reason)
         else:
             self.__closed = reason
         self.close()
@@ -261,7 +285,10 @@ class connector(dispatcher):
     def handle_close(self, reason=None):
         if __debug__:
             self.logger.debug('connector close %r', reason)
-        self.__handler.failed_connect(reason)
+        try:
+            self.__handler.failed_connect(reason)
+        except:
+            self.logger.exception("failed_connect(%r) failed", reason)
         self.close()
  
     def handle_write_event(self):
@@ -280,7 +307,11 @@ class connector(dispatcher):
             self.logger.debug('outgoing connected %r', self.addr)
 
         connection = _Connection(self.socket, self.addr, self.logger)
-        self.__handler.connected(connection)
+        try:
+            self.__handler.connected(connection)
+        except:
+            self.logger.exception("connection handler failed")
+            connection.handle_close("connection handler failed")
         return
 
     def handle_error(self):
@@ -337,7 +368,11 @@ class listener(asyncore.dispatcher):
         connection = _Connection(sock, addr, self.logger)
         self.__connections[connection] = 1
         connection.control = self
-        self.__handler(connection)
+        try:
+            self.__handler(connection)
+        except:
+            self.logger.exception("server handler failed")
+            self.close()
 
     def connections(self):
         return iter(self.__connections)

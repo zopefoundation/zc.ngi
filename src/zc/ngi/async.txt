@@ -68,7 +68,7 @@ we'll use the blocking interface:
 .. Error handling:
 
    If we pass a non-iterable to writelines, we'll get an immediate
-   error.  To demonstrate this we'll violate out output file and
+   error.  To demonstrate this we'll violate our output file and
    access it's _connection attribute so that we can bypass the check
    in the blocking writelines method:
 
@@ -83,7 +83,7 @@ we'll use the blocking interface:
     AssertionError: writelines does not accept strings
 
    If we pass an iterable that returns a non-string, we'll get a type
-   error when we try to read because handle_exception is caused ion
+   error when we try to read because handle_exception is called in
    the input handler.
 
     >>> output.writelines([2], timeout=0.1)
@@ -96,7 +96,86 @@ we'll use the blocking interface:
     ...
     TypeError: ('iterable output returned a non-string', 2)
 
+  If there is an error, then the connection is closed:
+
+    >>> input.read()
+    ''
+
+    >>> output.write('hello')
+    Traceback (most recent call last):
+    ...
+    IOError: I/O operation on closed file
+  
+  Handler errors cause connections to be closed.  To see this, we'll
+  send the server an error message, which foreces an error:
+
+    >>> output, input = zc.ngi.blocking.open(addr, zc.ngi.async.connector,
+    ...                                      timeout=1.0)
+    >>> output.write('E\0')
+    >>> input.read()
+    ''
+
+  Let's create some lame clients:
+
+    >>> import zope.testing.loggingsupport, logging
+    >>> loghandler = zope.testing.loggingsupport.InstalledHandler(
+    ...                  None, level=logging.ERROR)
+
+    >>> event = threading.Event()
+    >>> class LameClientConnectionHandler:
+    ...     def connected(self, connection):
+    ...         connection.setHandler(self)
+    ...         raise ValueError('Broken connector')
+    ...     def handle_close(self, conection, reason):
+    ...         self.closed = reason
+    ...         event.set()
+    
+    >>> handler = LameClientConnectionHandler()
+    >>> _ = zc.ngi.async.connector(addr, handler)
+    >>> event.wait(1)
+
+    >>> print loghandler
+    zc.ngi.async.client ERROR
+      connection handler failed
+
+    >>> handler.closed
+    'connection handler failed'
+
+
+    >>> loghandler.clear()
+    >>> class LameClientConnectionHandler:
+    ...     def connected(self, connection):
+    ...         connection.setHandler(self)
+    ...         connection.write('foo\0')
+    ...
+    ...     def handle_input(self, data):
+    ...         raise ValueError()         
+    ...
+    ...     def handle_close(self, conection, reason):
+    ...         self.closed = reason
+    ...         event.set()
+    >>> handler = LameClientConnectionHandler()
+    >>> _ = zc.ngi.async.connector(addr, handler)
+    >>> event.wait(1)
+
+    >>> print loghandler
+    zc.ngi.async.client ERROR
+      handle_input failed
+
+    >>> handler.closed
+    'handle_input failed'
+
+    >>> loghandler.uninstall()
+
 
 .. stop the server
 
     >>> zc.ngi.wordcount.stop_server_process(zc.ngi.async.connector, addr)
+    ... # doctest: +ELLIPSIS
+    handle_input failed
+    Traceback (most recent call last):
+    ...
+    ValueError: E
+
+   The server log was printed. Note that we see the Error that we
+   requested above.

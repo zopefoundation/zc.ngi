@@ -22,7 +22,8 @@ The NGI is an event-based framework in the sense that applications
 register handlers that respond to input events.  There are 3 kinds of
 handlers:
 
-- Input handlers receive network input
+- Input handlers receive network input and notification of connection
+  closes and exceptions,
 
 - Client-connect handlers respond to outbound connection events, and
 
@@ -35,6 +36,10 @@ The interfaces are designed to allow single-threaded applications:
   requirement does not extend across multiple implementations.
   Theoretically, different implementations could call handlers at the
   same time.)
+
+  Note that when an application calls setHandler on a connection, the
+  connection handler may have it's methods called immediately with
+  pending input or notifications.
 
 - All handler calls that are associated with a connection include the
   connection as a parameter,  This allows a single handler object to
@@ -71,7 +76,11 @@ class IConnection(Interface):
 
         This method can only be called in direct response to an
         implementation call to a IConnectionHandler,
-        IClientConnectHandler, or IServer
+        IClientConnectHandler, or IServer.
+
+        Any failure of a handler call must be caught and logged.  If
+        an exception is raised by a call to hande_input or
+        handle_exception, the connection must be closed.
         """
 
     def write(data):

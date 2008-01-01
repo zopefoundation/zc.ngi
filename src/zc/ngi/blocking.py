@@ -61,15 +61,16 @@ def open(connection_or_address, connector=None, timeout=None):
     if connector is None:
         connection = connection_or_address
     else:
-        connection = connect(connection_or_address, connector, timeout) 
-    return OutputFile(connection), InputFile(connection)
+        connection = connect(connection_or_address, connector, timeout)
+
+    outputfile = OutputFile(connection)
+    return outputfile, InputFile(connection, outputfile)
 
 class _BaseFile:
 
     def __init__(self, connection):
         self._connection = connection
         self._position = 0
-        self._closed = False
 
     def seek(self, offset, whence=0):
         position = self._position
@@ -88,9 +89,10 @@ class _BaseFile:
     def tell(self):
         return self._position
 
+    _closed = False
     def _check_open(self):
         if self._closed:
-            raise ValueError("I/O operation on closed file")
+            raise IOError("I/O operation on closed file")
 
 class OutputFile(_BaseFile):
 
@@ -100,7 +102,7 @@ class OutputFile(_BaseFile):
     read = readline = readlines = invalid_method
 
     def flush(self):
-        pass
+        self._check_exception()
 
     def close(self):
         if not self._closed:
@@ -108,12 +110,14 @@ class OutputFile(_BaseFile):
         self._closed = True
             
     def write(self, data):
+        self._check_exception()
         self._check_open()
         assert isinstance(data, str)
         self._position += len(data)
         self._connection.write(data)
             
     def writelines(self, data, timeout=None, nonblocking=False):
+        self._check_exception()
         self._check_open()
         if nonblocking:
             self._connection.writelines(iter(data))
@@ -126,8 +130,13 @@ class OutputFile(_BaseFile):
         event.wait(timeout)
         if not event.isSet():
             raise Timeout()
-        
-    
+
+    _exception = None
+    def _check_exception(self):
+        if self._exception is not None:
+            exception = self._exception
+            self._exception = None
+            raise exception
 
 class _writelines_iterator:
 
@@ -150,11 +159,12 @@ class _writelines_iterator:
 
 class InputFile(_BaseFile):
 
-    def __init__(self, connection):
+    def __init__(self, connection, outputfile):
         _BaseFile.__init__(self, connection)
         self._condition = threading.Condition()
         self._data = ''
-        self._exception = None
+        self._outputfile = outputfile
+        self._outputfile._exception = None
         connection.setHandler(self)
 
     def invalid_method(*args, **kw):
@@ -173,7 +183,7 @@ class InputFile(_BaseFile):
         condition = self._condition
         condition.acquire()
         try:
-            self._closed = True
+            self._closed = self._outputfile._closed = True
             condition.notifyAll()
         finally:
             condition.release()
@@ -182,7 +192,7 @@ class InputFile(_BaseFile):
         condition = self._condition
         condition.acquire()
         try:
-            self._exception = exception
+            self._outputfile._exception = exception
             condition.notifyAll()
         finally:
             condition.release()
@@ -191,7 +201,7 @@ class InputFile(_BaseFile):
         condition = self._condition
         condition.acquire()
         try:
-            self._closed = True
+            self._closed = self._outputfile._closed = True
             self._connection.close()
             condition.notifyAll()
         finally:
@@ -211,7 +221,7 @@ class InputFile(_BaseFile):
         condition = self._condition
         condition.acquire()
         try:
-            self._check_exception()
+            self._outputfile._check_exception()
             while 1:
                 data = self._data
                 if size is not None and size <= len(data):
@@ -234,7 +244,7 @@ class InputFile(_BaseFile):
         condition = self._condition
         condition.acquire()
         try:
-            self._check_exception()
+            self._outputfile._check_exception()
             while 1:
                 data = self._data
                 l = data.find('\n')
@@ -264,7 +274,7 @@ class InputFile(_BaseFile):
         condition = self._condition
         condition.acquire()
         try:
-            self._check_exception()
+            self._outputfile._check_exception()
             while 1:
                 data = self._data
                 if sizehint is not None and sizehint <= len(data):
@@ -281,12 +291,6 @@ class InputFile(_BaseFile):
         finally:
             condition.release()
 
-    def _check_exception(self):
-        if self._exception is not None:
-            exception = self._exception
-            self._exception = None
-            raise exception
-
     def _wait(self, timeout, deadline):
         if timeout is not None:
             if deadline is None:
@@ -301,7 +305,7 @@ class InputFile(_BaseFile):
         else:
             self._condition.wait()
 
-        self._check_exception()
+        self._outputfile._check_exception()
         
         return timeout, deadline
         

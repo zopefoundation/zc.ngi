@@ -59,6 +59,8 @@ class Server:
             elif data == 'C':
                 connection.write(zc.ngi.END_OF_DATA)
                 return
+            elif data == 'E':
+                raise ValueError(data)
             else:
                 cc = len(data)
                 lc = len(data.split('\n'))-1
@@ -72,6 +74,8 @@ class Server:
 def serve():
     mod, name, port, level = sys.argv[1:]
     __import__(mod)
+    logging.getLogger().addHandler(
+        logging.StreamHandler(open('server.log', 'w')))
     logger.setLevel(int(level))
     logger.addHandler(logging.StreamHandler())
     logger.info('serving')
@@ -120,7 +124,7 @@ def wait(addr, up=True):
         else:
             print "Server still accepting connections"
 
-def start_server_process(listener):
+def start_server_process(listener, loglevel=None):
     """Start a server in a subprocess and return the port used
     """
     module = listener.__module__
@@ -130,8 +134,10 @@ def start_server_process(listener):
         os.environ,
         PYTHONPATH=os.pathsep.join(sys.path),
         )
+    if loglevel is None:
+        loglevel = logger.getEffectiveLevel()
     os.spawnle(os.P_NOWAIT, sys.executable, sys.executable, __file__,
-               module, name, str(port), str(logger.getEffectiveLevel()),
+               module, name, str(port), str(loglevel),
                env)
     addr = 'localhost', port
     wait(addr)
@@ -140,6 +146,9 @@ def start_server_process(listener):
 def stop_server_process(connector, addr):
     zc.ngi.message.message(connector, addr, 'Q\0', lambda s: s == 'Q\n')
     wait(addr, up=False)
+    log = open('server.log').read()
+    os.remove('server.log')
+    print log,
 
 sample_docs = [
 """Hello world

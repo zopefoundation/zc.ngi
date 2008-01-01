@@ -403,13 +403,40 @@ zc.ngi.END_OF_DATA is encountered in the output stream.
     ...
     TypeError: Connection closed
 
-Peer connectors
-===============
+Connecting servers and clients
+==============================
 
 It is sometimes useful to connect a client handler and a server
-handler.  The zc.ngi.testing.peer function can be used to create a 
-connection to a peer handler. To illustrate, we'll set up an echo
-client that connects to our echo server:
+handler.  Listeners created with the zc.ngi.testing.listener class have a
+connector method that can be used to create connections to a server.
+
+Let's connect out echo server and client. First, we'll create out
+server using the listener constructor:
+
+    >>> listener = zc.ngi.testing.listener(EchoServer)
+
+Then we'll use the connector method on the listener:
+
+    >>> client = EchoClient(listener.connector)
+    >>> client.check(('localhost', 42), ['hello', 'world', 'how are you?'])
+    server connected
+    server got input: 'hello\n'
+    server got input: 'world\n'
+    server got input: 'how are you?\n'
+    got input: 'hello\nworld\nhow are you?\n'
+    matched: hello
+    matched: world
+    matched: how are you?
+    server closed: closed
+
+.. Peer connectors
+
+  Below is an older API for connecting servers and clients in a
+  testing environment.  The mechanisms defined above are prefered.
+
+  The zc.ngi.testing.peer function can be used to create a 
+  connection to a peer handler. To illustrate, we'll set up an echo
+  client that connects to our echo server:
 
     >>> client = EchoClient(zc.ngi.testing.peer(('localhost', 42), EchoServer))
     >>> client.check(('localhost', 42), ['hello', 'world', 'how are you?'])
