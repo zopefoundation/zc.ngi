@@ -1,0 +1,94 @@
+Additional testing tests
+========================
+
+The NGI promises that application handler calls are single threaded.
+Handlers aren't called simultaniously.  The testing implementation has
+to take special care to avoid calling handlers recursively.  Here's a
+simple example:
+
+    >>> class Greet:
+    ...     def __init__(self, connection=None, who='server'):
+    ...         self.state = 'i'
+    ...         self.who = who
+    ...         self.connection = connection
+    ...         connection.setHandler(self)
+    ...
+    ...     def handle_input(self, connection, data):
+    ...         print self.who, self.state, 'got:', data
+    ...         if self.state == 'i':
+    ...             connection.write('Hi')
+    ...             self.state = 'h'
+    ...         elif self.state == 'h':
+    ...             connection.write('Bye')
+    ...             connection.close()
+    ...             self.state = 'b'
+    ...         elif self.state == 'b':
+    ...             if data != 'Bye':
+    ...                 raise ValueError(self.state, data)
+    ...         else:
+    ...             raise ValueError(self.state, data)
+    ...
+    ...     def handle_close(self, connection, reason):
+    ...         print self.who, 'closed', self.state, reason
+
+    >>> class Connector:
+    ...     def __init__(self, class_=Greet):
+    ...         self.class_ = class_
+    ...     def connected(self, connection):
+    ...         self.class_(connection, 'client')
+    ...         connection.write('start')
+
+    >>> import zc.ngi.testing
+    >>> listener = zc.ngi.testing.listener(Greet)
+    >>> listener.connector('', Connector())
+    server i got: start
+    client i got: Hi
+    server h got: Hi
+    client h got: Bye
+    client closed b closed
+
+If an exeption is raised by a handler, then the exception is logged
+and the connection is closed (if not already closed).
+
+    >>> class Greet2(Greet):
+    ...     def handle_input(self, connection, data):
+    ...         raise ValueError('input', self.state, data)
+
+    >>> listener = zc.ngi.testing.listener(Greet2)
+    >>> listener.connector('', Connector())
+    ... # doctest: +ELLIPSIS
+    Error test connection calling connection handler:
+    Traceback (most recent call last):
+    ...
+    ValueError: ('input', 'i', 'start')
+    client closed i closed
+    server closed i handle_input error
+
+    >>> listener = zc.ngi.testing.listener(Greet)
+    >>> listener.connector('', Connector(Greet2))
+    ... # doctest: +ELLIPSIS
+    server i got: start
+    Error test connection calling connection handler:
+    Traceback (most recent call last):
+    ...
+    ValueError: ('input', 'i', 'Hi')
+    client closed i handle_input error
+    server closed h closed
+
+    >>> class Greet3(Greet):
+    ...     def handle_close(self, connection, reason):
+    ...         raise ValueError('close', self.state, reason)
+
+    >>> listener = zc.ngi.testing.listener(Greet2)
+    >>> listener.connector('', Connector(Greet3))
+    ... # doctest: +ELLIPSIS
+    Error test connection calling connection handler:
+    Traceback (most recent call last):
+    ...
+    ValueError: ('input', 'i', 'start')
+    Error test connection calling connection handler:
+    Traceback (most recent call last):
+    ...
+    ValueError: ('close', 'i', 'closed')
+    server closed i handle_input error
+
