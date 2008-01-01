@@ -17,6 +17,23 @@ Changes
 *******
 
 ==================
+1.1.0 (2008-01-?)
+==================
+
+Bugs fixed:
+
+- Blocking input and output files didn't properly synchronize closing.
+
+- The testing implementation made muiltile simultaneous calls to
+  handler methods in violation of the promise made in interfaces.py.
+
+New features:
+
+- Implementations are now required to log handler errors and to close
+  connections in response to connection-handler errors. (Otherwise,
+  handlers, and especially handler adapters, would have to do this.)
+
+==================
 1.0.1 (2007-05-30)
 ==================
 
