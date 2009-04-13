@@ -99,7 +99,7 @@ class _Connection(dispatcher):
             except:
                 self.logger.exception("handle_exception failed")
                 return self.handle_close("handle_exception failed")
-                
+
         if self.__closed:
             try:
                 handler.handle_close(self, self.__closed)
@@ -107,14 +107,14 @@ class _Connection(dispatcher):
                 self.logger.exception("Exception raised by handle_close(%r)",
                                       self.__closed)
                 raise
-        
+
     def write(self, data):
         if __debug__:
             self.logger.debug('write %r', data)
         assert isinstance(data, str) or (data is zc.ngi.END_OF_DATA)
         self.__output.append(data)
         notify_select()
-        
+
     def writelines(self, data):
         if __debug__:
             self.logger.debug('writelines %r', data)
@@ -138,7 +138,7 @@ class _Connection(dispatcher):
 
     def handle_read_event(self):
         assert self.readable()
-        
+
         while 1:
             try:
                 d = self.recv(8192)
@@ -157,7 +157,7 @@ class _Connection(dispatcher):
             except:
                 self.logger.exception("handle_input failed")
                 self.handle_close("handle_input failed")
-                
+
             if len(d) < 8192:
                 break
 
@@ -171,7 +171,7 @@ class _Connection(dispatcher):
             if v is zc.ngi.END_OF_DATA:
                 self.close()
                 return
-            
+
             if not isinstance(v, str):
                 # Must be an iterator
                 try:
@@ -180,7 +180,7 @@ class _Connection(dispatcher):
                     # all done
                     output.pop(0)
                     continue
-                
+
                 if __debug__ and not isinstance(v, str):
                     exc = TypeError("iterable output returned a non-string", v)
                     self.__report_exception(exc)
@@ -201,7 +201,7 @@ class _Connection(dispatcher):
             except Exception, v:
                 self.__report_exception(v)
                 raise
-            
+
             if n == len(v):
                 output.pop(0)
             else:
@@ -217,7 +217,7 @@ class _Connection(dispatcher):
                 self.handle_close("handle_exception failed")
         else:
             self.__exception = exception
-            
+
     def handle_close(self, reason='end of input'):
         if __debug__:
             self.logger.debug('close %r', reason)
@@ -233,7 +233,7 @@ class _Connection(dispatcher):
 
     def handle_expt(self):
         self.handle_close('socket error')
-        
+
 
 class connector(dispatcher):
 
@@ -290,11 +290,11 @@ class connector(dispatcher):
         except:
             self.logger.exception("failed_connect(%r) failed", reason)
         self.close()
- 
+
     def handle_write_event(self):
         err = self.socket.connect_ex(self.addr)
         if err in self._CONNECT_IN_PROGRESS:
-            return 
+            return
 
         if err not in self._CONNECT_OK:
             reason = errno.errorcode.get(err) or str(err)
@@ -404,7 +404,7 @@ class listener(asyncore.dispatcher):
         reason = sys.exc_info()[1]
         self.logger.exception('listener error')
         self.close()
-    
+
 # The following trigger code is greatly simplified from the Medusa
 # trigger code.
 
@@ -530,7 +530,7 @@ def loop():
     map = _map
     connectors = _connectors
 
-# There seem to be some issues with poll.  
+# There seem to be some issues with poll.
 ##     if (hasattr(select, 'poll') and
 ##         (sys.version_info[:2] > (2, 3)) # There seem to be poll issues in 2.3
 ##         ):
@@ -548,7 +548,7 @@ def loop():
         for f in list(connectors):
             c = connectors.pop(f)
             c.connect()
-            
+
         try:
             poll_fun(timeout, map)
         except:
