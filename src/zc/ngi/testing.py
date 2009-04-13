@@ -53,7 +53,7 @@ class Connection:
         self.exception = None
         if peer is None:
             peer = Connection(self)
-            handler(peer)d
+            handler(peer)
         self.peer = peer
 
     def __nonzero__(self):
