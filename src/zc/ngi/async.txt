@@ -72,10 +72,10 @@ we'll use the blocking interface:
    access it's _connection attribute so that we can bypass the check
    in the blocking writelines method:
 
-    >>> output._connection.writelines(2)
+    >>> output._connection.writelines(2) # doctest: +ELLIPSIS
     Traceback (most recent call last):
     ...
-    TypeError: iteration over non-sequence
+    TypeError: ...
 
     >>> output._connection.writelines('foo')
     Traceback (most recent call last):

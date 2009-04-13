@@ -395,8 +395,9 @@ class listener(asyncore.dispatcher):
         else:
             self.__close_handler = handler
 
-    def add_channel(self):
+    def add_channel(self, map=None):
         # work around file-dispatcher bug
+        assert (map is None) or (map is _map)
         asyncore.dispatcher.add_channel(self, _map)
 
     def handle_error(self):
@@ -445,8 +446,9 @@ if os.name == 'posix':
                 self.logger.debug('pulled %s', pid)
             os.write(self.__writefd, 'x')
 
-        def add_channel(self):
+        def add_channel(self, map=None):
             # work around file-dispatcher bug
+            assert (map is None) or (map is _map)
             asyncore.dispatcher.add_channel(self, _map)
 
 else:
