@@ -53,9 +53,9 @@ class Connection:
         self.exception = None
         if peer is None:
             peer = Connection(self)
-            handler(peer)
+            handler(peer)d
         self.peer = peer
-        
+
     def __nonzero__(self):
         return not self.closed
 
@@ -75,7 +75,7 @@ class Connection:
                     if method != 'handle_close':
                         self.close()
                         self.handler.handle_close(self, method+' error')
-                    
+
             self.queue = None
         else:
             self.queue.append((method, args))
@@ -88,7 +88,7 @@ class Connection:
         def write(s):
             raise TypeError("Connection closed")
         self.write = write
-        
+
     def setHandler(self, handler):
         self.handler = handler
         if self.exception:
@@ -183,7 +183,7 @@ class listener:
 
     def connections(self):
         return iter(self._connections)
-        
+
     def close(self, handler=None):
         self._handler = None
         if handler is None:
@@ -201,7 +201,7 @@ class listener:
 
     def connector(self, addr, handler):
         handler.connected(Connection(None, self._handler))
-        
+
 
 class peer:
 
