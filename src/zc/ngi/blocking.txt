@@ -88,7 +88,7 @@ Timeout exception is raised:
     ...
     Timeout
 
-    >>> 0.5 < (time.time() - then) < 1
+    >>> 0.5 <= (time.time() - then) < 1
     True
 
 The readline and readlines functions accept a timeout as well:
@@ -99,7 +99,7 @@ The readline and readlines functions accept a timeout as well:
     ...
     Timeout
 
-    >>> 0.5 < (time.time() - then) < 1
+    >>> 0.5 <= (time.time() - then) < 1
     True
 
     >>> then = time.time()
@@ -108,7 +108,7 @@ The readline and readlines functions accept a timeout as well:
     ...
     Timeout
 
-    >>> 0.5 < (time.time() - then) < 1
+    >>> 0.5 <= (time.time() - then) < 1
     True
 
 Timeouts can also be specified when connecting. To illustrate this,
@@ -120,7 +120,7 @@ we'll pass a do-nothing connector:
     ...
     ConnectionTimeout
 
-    >>> 0.5 < (time.time() - then) < 1
+    >>> 0.5 <= (time.time() - then) < 1
     True
 
 Low-level connection management
@@ -152,5 +152,5 @@ Like the open function, the connect function accepts a timeout:
     ...
     ConnectionTimeout
 
-    >>> 0.5 < (time.time() - then) < 1
+    >>> 0.5 <= (time.time() - then) < 1
     True
