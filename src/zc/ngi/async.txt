@@ -46,7 +46,7 @@ shouldn't get any output.
 
     >>> _ = [thread.start() for thread in threads]
     >>> _ = [thread.join() for thread in threads]
-    
+
 Iterable input
 ==============
 
@@ -60,7 +60,7 @@ we'll use the blocking interface:
     ...     yield "hello\n"
     ...     yield name
     ...     yield "\0"
-    
+
     >>> output.writelines(hello('world'), timeout=1.0)
     >>> input.readline(timeout=1.0)
     '1 2 11\n'
@@ -105,7 +105,7 @@ we'll use the blocking interface:
     Traceback (most recent call last):
     ...
     IOError: I/O operation on closed file
-  
+
   Handler errors cause connections to be closed.  To see this, we'll
   send the server an error message, which foreces an error:
 
@@ -129,7 +129,7 @@ we'll use the blocking interface:
     ...     def handle_close(self, conection, reason):
     ...         self.closed = reason
     ...         event.set()
-    
+
     >>> handler = LameClientConnectionHandler()
     >>> _ = zc.ngi.async.connector(addr, handler)
     >>> event.wait(1)
@@ -149,7 +149,7 @@ we'll use the blocking interface:
     ...         connection.write('foo\0')
     ...
     ...     def handle_input(self, data):
-    ...         raise ValueError()         
+    ...         raise ValueError()
     ...
     ...     def handle_close(self, conection, reason):
     ...         self.closed = reason
