@@ -27,7 +27,7 @@ import sys
 import threading
 import time
 
-import zc.ngi    
+import zc.ngi
 import zc.ngi.message
 
 _lock = threading.Lock()
@@ -38,7 +38,7 @@ run = _lock.acquire
 logger = logging.getLogger('zc.ngi.wordcount')
 
 class Server:
-    
+
     def __init__(self, connection):
         if __debug__:
             logger.debug("Server(%r)", connection)
@@ -180,7 +180,7 @@ class Client:
             logger.debug("connected(%r)", connection)
         connection.write(self.docs[0]+'\0')
         connection.setHandler(self)
-        
+
     def failed_connect(self, reason):
         print 'Failed to connect:', reason
         self.notify()
