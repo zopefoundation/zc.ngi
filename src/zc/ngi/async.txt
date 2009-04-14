@@ -143,6 +143,8 @@ we'll use the blocking interface:
 
 
     >>> loghandler.clear()
+    >>> event.clear()
+
     >>> class LameClientConnectionHandler:
     ...     def connected(self, connection):
     ...         connection.setHandler(self)
@@ -154,6 +156,7 @@ we'll use the blocking interface:
     ...     def handle_close(self, conection, reason):
     ...         self.closed = reason
     ...         event.set()
+
     >>> handler = LameClientConnectionHandler()
     >>> _ = zc.ngi.async.connector(addr, handler)
     >>> event.wait(1)
