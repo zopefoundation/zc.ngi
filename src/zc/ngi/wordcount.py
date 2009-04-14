@@ -54,7 +54,7 @@ class Server:
             if data == 'Q':
                 connection.write('Q\n')
                 connection.write(zc.ngi.END_OF_DATA)
-                connection.control.close(lambda c: 1)
+                connection.control.close(lambda c: exit())
                 return
             elif data == 'C':
                 connection.write(zc.ngi.END_OF_DATA)
@@ -74,13 +74,16 @@ class Server:
 def serve():
     mod, name, port, level = sys.argv[1:]
     __import__(mod)
-    logging.getLogger().addHandler(
-        logging.StreamHandler(open('server.log', 'w')))
+    logfile = open('server.log', 'w')
+    handler = logging.StreamHandler(logfile)
+    logging.getLogger().addHandler(handler)
     logger.setLevel(int(level))
     logger.addHandler(logging.StreamHandler())
     logger.info('serving')
     getattr(sys.modules[mod], name)(('localhost', int(port)), Server)
     run()
+    logging.getLogger().removeHandler(handler)
+    handler.close()
 
 def get_port():
     """Return a port that is not in use.
