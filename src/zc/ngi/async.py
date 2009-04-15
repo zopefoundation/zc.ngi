@@ -46,6 +46,8 @@ expected_socket_write_errors = {
     errno.EINTR: 0,
     }
 
+BUFFER_SIZE = 8*1024
+
 class dispatcher(asyncore.dispatcher):
 
     def __init__(self, sock, addr, map=_map):
@@ -141,7 +143,7 @@ class _Connection(dispatcher):
 
         while 1:
             try:
-                d = self.recv(8192)
+                d = self.recv(BUFFER_SIZE)
             except socket.error, err:
                 if err[0] in expected_socket_read_errors:
                     return
@@ -158,7 +160,7 @@ class _Connection(dispatcher):
                 self.logger.exception("handle_input failed")
                 self.handle_close("handle_input failed")
 
-            if len(d) < 8192:
+            if len(d) < BUFFER_SIZE:
                 break
 
     def handle_write_event(self):
@@ -345,7 +347,7 @@ class listener(asyncore.dispatcher):
         self.set_reuse_addr()
         self.logger.info("listening on %s", self.addr)
         self.bind(self.addr)
-        self.listen(5)
+        self.listen(255)
         notify_select()
 
     def handle_accept(self):
@@ -425,7 +427,7 @@ class _Triggerbase(object):
 
     def handle_read(self):
         try:
-            self.recv(8192)
+            self.recv(BUFFER_SIZE)
         except socket.error:
             return
 
