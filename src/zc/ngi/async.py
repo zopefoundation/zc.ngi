@@ -531,19 +531,6 @@ def loop():
     timeout = 30.0
     map = _map
     connectors = _connectors
-
-# There seem to be some issues with poll.
-##     if (hasattr(select, 'poll') and
-##         (sys.version_info[:2] > (2, 3)) # There seem to be poll issues in 2.3
-##         ):
-##         poll_fun = asyncore.poll3
-##     else:
-##         poll_fun = asyncore.poll
-
-
-    # At least for now, stick with tried and true select
-    poll_fun = asyncore.poll
-
     logger = logging.getLogger('zc.ngi.async.loop')
 
     while map:
@@ -552,7 +539,7 @@ def loop():
             c.connect()
 
         try:
-            poll_fun(timeout, map)
+            asyncore.poll(timeout, map)
         except:
             logger.exception('loop error')
             raise
@@ -560,4 +547,3 @@ def loop():
 _thread = threading.Thread(target=loop)
 _thread.setDaemon(True)
 _thread.start()
-
