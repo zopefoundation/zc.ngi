@@ -1,0 +1,23 @@
+async UDP support
+-----------------
+
+    >>> import zc.ngi.async, time
+
+    >>> zc.ngi.async.udp(('', 9644), 'test')
+
+    >>> def handler(addr, message):
+    ...     print message
+
+    >>> listener = zc.ngi.async.udp_listener(('', 9644), handler)
+    >>> time.sleep(0.1)
+
+    >>> zc.ngi.async.udp(('', 9644), 'test'); time.sleep(0.1)
+    test
+
+    >>> zc.ngi.async.udp(('', 9644), 'test'); time.sleep(0.1)
+    test
+
+    >>> listener.close()
+    >>> time.sleep(0.1)
+
+    >>> zc.ngi.async.udp(('', 9644), 'test'); time.sleep(0.1)

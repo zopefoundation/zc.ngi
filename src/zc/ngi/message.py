@@ -51,7 +51,7 @@ class Message:
         self.notify(self.input, reason)
 
 
-def message(connector, addr, message, expected=None):
+def message(connect, addr, message, expected=None):
     result = []
     lock = threading.Lock()
     lock.acquire()
@@ -60,7 +60,7 @@ def message(connector, addr, message, expected=None):
             return # already notified
         result.extend(args)
         lock.release()
-    connector(addr, Message(message, expected, notify))
+    connect(addr, Message(message, expected, notify))
     lock.acquire()
     data, reason = result
 

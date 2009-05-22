@@ -32,16 +32,16 @@ class ConnectionTimeout(Timeout, ConnectionFailed):
     """An attempt to connect timed out.
     """
 
-def connect(address, connector, timeout=None):
-    return _connector().connect(address, connector, timeout)
+def connect(address, connect, timeout=None):
+    return _connector().connect(address, connect, timeout)
     
 class _connector:
 
     failed = connection = None
 
-    def connect(self, address, connector, timeout):
+    def connect(self, address, connect, timeout):
         event = self.event = threading.Event()
-        connector(address, self)
+        connect(address, self)
         event.wait(timeout)
         if self.failed is not None:
             raise ConnectionFailed(self.failed)

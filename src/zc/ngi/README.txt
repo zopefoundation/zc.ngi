@@ -13,30 +13,32 @@ greater separation of concerns.
 
 There are several interfaces defined by the NGI:
 
+IImplementation
+    APIs for implementing and connecting to TCP servers and for
+    implemented and sending messages to UDP servers.
+
 IConnection
     Network connection implementation.  This is the core interface that
     applications interact with,
 
 IConnectionHandler
-    Application component that handles network input.  
-
-IConnector
-    Create IConnection objects by making outgoing connections.
+    Application component that handles TCP network input.
 
 IClientConnectHandler
     Application callback that handles successful or failed outgoing
-    connections.
-
-IListener
-    Listen for incoming connections.
+    TCP connections.
 
 IServer
-    Callback to handle incoming connections.
+    Application callback to handle incoming connections.
+
+IUDPHandler
+    Application callback to handle incoming UDP messages.
 
 The interfaces are split between "implementation" and "application"
-interfaces.  An implementation of the NGI provides IConnection,
-IConnector, and IListener. An application provides IConnectionHandler
-and one or both of IClientConnectHandler and IServer.
+interfaces.  An implementation of the NGI provides Implementation,
+IConnection, IListener, and IUDPListener. An application provides
+IConnectionHandler and one or more of IClientConnectHandler,
+IServer, or IUDPHandler.
 
 For more information, see interfaces.py.
 
@@ -68,12 +70,12 @@ that the server properly echoes data sent do it.
 
     >>> class EchoClient:
     ...
-    ...     def __init__(self, connector):
-    ...         self.connector = connector
+    ...     def __init__(self, connect):
+    ...         self.connect = connect
     ...
     ...     def check(self, addr, strings):
     ...         self.strings = strings
-    ...         self.connector(addr, self)
+    ...         self.connect(addr, self)
     ...
     ...     def connected(self, connection):
     ...         for s in self.strings:
@@ -113,9 +115,9 @@ The client implements the IClientConnectHandler and IConnectionHandler
 interfaces.  More complex clients might implement these interfaces with
 separate classes.
 
-We'll instantiate our client using the testing connector:
+We'll instantiate our client using the testing connect:
 
-    >>> client = EchoClient(zc.ngi.testing.connector)
+    >>> client = EchoClient(zc.ngi.testing.connect)
 
 Now we'll try to check a non-existent server:
 
@@ -126,7 +128,7 @@ Our client simply prints a message (and gives up) if a connection
 fails. More complex applications might retry, waiting between attempts,
 and so on.
 
-The testing connector always fails unless given a test connection
+The testing connect always fails unless given a test connection
 ahead of time.  We'll create a testing connection and register it so a
 connection can succeed:
 
@@ -211,7 +213,7 @@ Implementing network servers
 ============================
 
 Implementing network servers is very similar to implementing clients,
-except that a listener, rather than a connector is used.  Let's
+except that a listener, rather than a connect is used.  Let's
 implement a simple echo server:
 
 
@@ -288,7 +290,7 @@ access to the active connections:
     >>> connection = zc.ngi.testing.Connection()
     >>> listener.connect(connection)
     server connected
-   
+
     >>> list(listener.connections()) == [connection]
     True
 
@@ -348,7 +350,7 @@ But no more connections are accepted:
     Traceback (most recent call last):
     ...
     TypeError: Listener closed
-    
+
 And the handler will be called when all of the listener's connections
 are closed:
 
@@ -362,7 +364,7 @@ Long output
 ===========
 
 Test requests output data written to them.  If output exceeds 50
-characters in length, it is wrapped by simply breaking the repr into 
+characters in length, it is wrapped by simply breaking the repr into
 50-characters parts:
 
     >>> connection = zc.ngi.testing.Connection()
@@ -408,16 +410,16 @@ Connecting servers and clients
 
 It is sometimes useful to connect a client handler and a server
 handler.  Listeners created with the zc.ngi.testing.listener class have a
-connector method that can be used to create connections to a server.
+connect method that can be used to create connections to a server.
 
 Let's connect out echo server and client. First, we'll create out
 server using the listener constructor:
 
     >>> listener = zc.ngi.testing.listener(EchoServer)
 
-Then we'll use the connector method on the listener:
+Then we'll use the connect method on the listener:
 
-    >>> client = EchoClient(listener.connector)
+    >>> client = EchoClient(listener.connect)
     >>> client.check(('localhost', 42), ['hello', 'world', 'how are you?'])
     server connected
     server got input: 'hello\n'
@@ -434,7 +436,7 @@ Then we'll use the connector method on the listener:
   Below is an older API for connecting servers and clients in a
   testing environment.  The mechanisms defined above are prefered.
 
-  The zc.ngi.testing.peer function can be used to create a 
+  The zc.ngi.testing.peer function can be used to create a
   connection to a peer handler. To illustrate, we'll set up an echo
   client that connects to our echo server:
 
@@ -449,3 +451,34 @@ Then we'll use the connector method on the listener:
     matched: world
     matched: how are you?
     server closed: closed
+
+UDP Support
+===========
+
+To send a UDP message, just use an implementations udp method:
+
+    >>> zc.ngi.testing.udp(('', 42), "hello")
+
+If there isn't a server listening, the call will effectively be
+ignored. This is UDP. :)
+
+    >>> def my_udp_handler(addr, data):
+    ...     print 'from %r got %r' % (addr, data)
+
+    >>> listener = zc.ngi.testing.udp_listener(('', 42), my_udp_handler)
+
+    >>> zc.ngi.testing.udp(('', 42), "hello")
+    from '<test>' got 'hello'
+
+    >>> listener.close()
+    >>> zc.ngi.testing.udp(('', 42), "hello")
+
+For a handler is used if you don't pass a handler:
+
+    >>> listener = zc.ngi.testing.udp_listener(('', 43))
+    >>> zc.ngi.testing.udp(('', 43), "hello")
+    udp from '<test>' to ('', 43):
+      'hello'
+
+    >>> listener.close()
+    >>> zc.ngi.testing.udp(('', 43), "hello")

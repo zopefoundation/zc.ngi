@@ -40,7 +40,7 @@ simple example:
 
     >>> import zc.ngi.testing
     >>> listener = zc.ngi.testing.listener(Greet)
-    >>> listener.connector('', Connector())
+    >>> listener.connect('', Connector())
     server i got: start
     client i got: Hi
     server h got: Hi
@@ -55,7 +55,7 @@ and the connection is closed (if not already closed).
     ...         raise ValueError('input', self.state, data)
 
     >>> listener = zc.ngi.testing.listener(Greet2)
-    >>> listener.connector('', Connector())
+    >>> listener.connect('', Connector())
     ... # doctest: +ELLIPSIS
     Error test connection calling connection handler:
     Traceback (most recent call last):
@@ -65,7 +65,7 @@ and the connection is closed (if not already closed).
     server closed i handle_input error
 
     >>> listener = zc.ngi.testing.listener(Greet)
-    >>> listener.connector('', Connector(Greet2))
+    >>> listener.connect('', Connector(Greet2))
     ... # doctest: +ELLIPSIS
     server i got: start
     Error test connection calling connection handler:
@@ -80,7 +80,7 @@ and the connection is closed (if not already closed).
     ...         raise ValueError('close', self.state, reason)
 
     >>> listener = zc.ngi.testing.listener(Greet2)
-    >>> listener.connector('', Connector(Greet3))
+    >>> listener.connect('', Connector(Greet3))
     ... # doctest: +ELLIPSIS
     Error test connection calling connection handler:
     Traceback (most recent call last):

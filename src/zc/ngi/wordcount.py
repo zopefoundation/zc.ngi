@@ -146,8 +146,8 @@ def start_server_process(listener, loglevel=None):
     wait(addr)
     return port
 
-def stop_server_process(connector, addr):
-    zc.ngi.message.message(connector, addr, 'Q\0', lambda s: s == 'Q\n')
+def stop_server_process(connect, addr):
+    zc.ngi.message.message(connect, addr, 'Q\0', lambda s: s == 'Q\n')
     wait(addr, up=False)
     log = open('server.log').read()
     os.remove('server.log')
@@ -214,12 +214,12 @@ class Client:
         if self.docs:
             print 'unexpected close', reason
 
-def client_thread(connector, addr):
+def client_thread(connect, addr):
     logger.info('client started for %s', addr)
     lock = threading.Lock()
     lock.acquire()
     client = Client(notify=lock.release)
-    connector(addr, client)
+    connect(addr, client)
     logger.info('client waiting')
     lock.acquire() # wait till done
     logger.info('client done')

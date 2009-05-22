@@ -330,23 +330,41 @@ class connector(dispatcher):
     def handle_expt(self):
         self.handle_close('connection failed')
 
-class listener(asyncore.dispatcher):
+def connect(*args):
+    connector(*args)
+
+class BaseListener(asyncore.dispatcher):
+
+    def writable(self):
+        return False
+
+    def add_channel(self, map=None):
+        # work around file-dispatcher bug
+        assert (map is None) or (map is _map)
+        asyncore.dispatcher.add_channel(self, _map)
+
+    def handle_error(self):
+        reason = sys.exc_info()[1]
+        self.logger.exception('listener error')
+        self.close()
+
+class listener(BaseListener):
 
     logger = logging.getLogger('zc.ngi.async.server')
 
     def __init__(self, addr, handler):
-        self.addr = addr
         self.__handler = handler
         self.__close_handler = None
         self.__connections = {}
         asyncore.dispatcher.__init__(self)
         if isinstance(addr, str):
-            self.create_socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            family = socket.AF_UNIX
         else:
-            self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+            family = socket.AF_INET
+        self.create_socket(family, socket.SOCK_STREAM)
         self.set_reuse_addr()
-        self.logger.info("listening on %s", self.addr)
-        self.bind(self.addr)
+        self.logger.info("listening on %r", self.addr)
+        self.bind(addr)
         self.listen(255)
         notify_select()
 
@@ -397,15 +415,46 @@ class listener(asyncore.dispatcher):
         else:
             self.__close_handler = handler
 
-    def add_channel(self, map=None):
-        # work around file-dispatcher bug
-        assert (map is None) or (map is _map)
-        asyncore.dispatcher.add_channel(self, _map)
+class udp_listener(BaseListener):
 
-    def handle_error(self):
-        reason = sys.exc_info()[1]
-        self.logger.exception('listener error')
-        self.close()
+    logger = logging.getLogger('zc.ngi.async.udpserver')
+    connected = True
+
+    def __init__(self, addr, handler, buffer_size=4096):
+        self.__handler = handler
+        self.__buffer_size = buffer_size
+        asyncore.dispatcher.__init__(self)
+        if isinstance(addr, str):
+            family = socket.AF_UNIX
+        else:
+            family = socket.AF_INET
+        self.create_socket(family, socket.SOCK_DGRAM)
+        self.set_reuse_addr()
+        self.logger.info("listening on udp %r", self.addr)
+        self.bind(addr)
+        notify_select()
+
+    def handle_read(self):
+        message, addr = self.recvfrom(self.__buffer_size)
+        self.__handler(addr, message)
+
+    def close(self):
+        self.del_channel(_map)
+        self.socket.close()
+
+# udp uses GIL to get thread-safe socket management
+_udp_socks = {socket.AF_INET: [], socket.AF_UNIX: []}
+def udp(address, message):
+    if isinstance(address, str):
+        family = socket.AF_UNIX
+    else:
+        family = socket.AF_INET
+    try:
+        sock = _udp_socks[family].pop()
+    except IndexError:
+        sock = socket.socket(family, socket.SOCK_DGRAM)
+    sock.sendto(message, address)
+    _udp_socks[family].append(sock)
 
 # The following trigger code is greatly simplified from the Medusa
 # trigger code.

@@ -41,7 +41,7 @@ shouldn't get any output.
     >>> import threading
     >>> addr = 'localhost', port
     >>> threads = [threading.Thread(target=zc.ngi.wordcount.client_thread,
-    ...                             args=(zc.ngi.async.connector, addr))
+    ...                             args=(zc.ngi.async.connect, addr))
     ...            for i in range(200)]
 
     >>> _ = [thread.start() for thread in threads]
@@ -54,7 +54,7 @@ We can pass data to the server using an iterator.  To illustrate this,
 we'll use the blocking interface:
 
     >>> import zc.ngi.blocking
-    >>> output, input = zc.ngi.blocking.open(addr, zc.ngi.async.connector,
+    >>> output, input = zc.ngi.blocking.open(addr, zc.ngi.async.connect,
     ...                                      timeout=1.0)
     >>> def hello(name):
     ...     yield "hello\n"
@@ -109,7 +109,7 @@ we'll use the blocking interface:
   Handler errors cause connections to be closed.  To see this, we'll
   send the server an error message, which foreces an error:
 
-    >>> output, input = zc.ngi.blocking.open(addr, zc.ngi.async.connector,
+    >>> output, input = zc.ngi.blocking.open(addr, zc.ngi.async.connect,
     ...                                      timeout=1.0)
     >>> output.write('E\0')
     >>> input.read()
@@ -131,7 +131,7 @@ we'll use the blocking interface:
     ...         event.set()
 
     >>> handler = LameClientConnectionHandler()
-    >>> _ = zc.ngi.async.connector(addr, handler)
+    >>> zc.ngi.async.connect(addr, handler)
     >>> event.wait(1)
 
     >>> print loghandler
@@ -158,7 +158,7 @@ we'll use the blocking interface:
     ...         event.set()
 
     >>> handler = LameClientConnectionHandler()
-    >>> _ = zc.ngi.async.connector(addr, handler)
+    >>> zc.ngi.async.connect(addr, handler)
     >>> event.wait(1)
 
     >>> print loghandler
@@ -173,7 +173,7 @@ we'll use the blocking interface:
 
 .. stop the server
 
-    >>> zc.ngi.wordcount.stop_server_process(zc.ngi.async.connector, addr)
+    >>> zc.ngi.wordcount.stop_server_process(zc.ngi.async.connect, addr)
     ... # doctest: +ELLIPSIS
     handle_input failed
     Traceback (most recent call last):

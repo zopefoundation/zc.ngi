@@ -18,12 +18,12 @@ without using a network:
     >>> import zc.ngi.testing
     >>> connector = zc.ngi.testing.peer(('localhost', 42),
     ...                                 zc.ngi.wordcount.Server)
-    
-The open function is called with an address and a connector:
-    
+
+The open function is called with an address and a connect callable:
+
     >>> import zc.ngi.blocking
     >>> output, input = zc.ngi.blocking.open(('localhost', 42), connector)
-    
+
 The output file lets us send output to the server:
 
     >>> output.write("Hello\n")
@@ -67,7 +67,7 @@ Or to read the remaining data:
     '4\n1 2 9\n'
 
 If read is called without a size, it won't return until the server has
-closed the connection.  
+closed the connection.
 
 In this example, we've been careful to only read as much data as the
 server produces.  For example, we called read without passing a length
@@ -126,14 +126,14 @@ we'll pass a do-nothing connector:
 Low-level connection management
 ===============================
 
-When we used open above, we passed an address and a connector, and the
-oprn function created a connection and created file-like objects for
+When we used open above, we passed an address and a connect callable, and the
+open function created a connection and created file-like objects for
 output and input.  The connect function can be used to create a
 connection without a file-like object:
 
     >>> connection = zc.ngi.blocking.connect(('localhost', 42), connector)
 
-The if the open function is called without a connector, the the first
+The if the open function is called without a connect callable, the the first
 object must be a connection object and output and input objects for
 that connection will be returned:
 

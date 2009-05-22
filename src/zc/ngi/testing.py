@@ -157,12 +157,14 @@ class TextConnection(Connection):
 
 _connectable = {}
 
-def connector(addr, handler):
+def connect(addr, handler):
     connections = _connectable.get(addr)
     if connections:
         handler.connected(connections.pop(0))
     else:
         handler.failed_connect('no such server')
+
+connector = connect
 
 def connectable(addr, connection):
     _connectable.setdefault(addr, []).append(connection)
@@ -174,12 +176,18 @@ class listener:
         self._close_handler = None
         self._connections = []
 
-    def connect(self, connection):
+    def connect(self, connection, handler=None):
+        if handler is not None:
+            # connection is addr in this case and is ignored
+            handler.connected(Connection(None, self._handler))
+            return
         if self._handler is None:
             raise TypeError("Listener closed")
         self._connections.append(connection)
         connection.control = self
         self._handler(connection)
+
+    connector = connect
 
     def connections(self):
         return iter(self._connections)
@@ -198,10 +206,6 @@ class listener:
         self._connections.remove(connection)
         if not self._connections and self._close_handler:
             self._close_handler(self)
-
-    def connector(self, addr, handler):
-        handler.connected(Connection(None, self._handler))
-
 
 class peer:
 
@@ -237,3 +241,32 @@ def get_port():
         finally:
             s.close()
     raise RuntimeError("Can't find port")
+
+
+class test_udp_handler:
+
+    def __init__(self, addr):
+        self.addr = addr
+
+    def __call__(self, addr, data):
+        sys.stdout.write("udp from %r to %r:\n  %r" % (addr, self.addr, data))
+
+_udp_handlers = {}
+class udp_listener:
+
+    def __init__(self, address, handler=None, buffer_size=4096):
+        if handler is None:
+            handler = test_udp_handler(address)
+        self.address = address
+        _udp_handlers[address] = handler, buffer_size
+
+    def close(self):
+        del _udp_handlers[self.address]
+
+def udp(addr, data):
+    handler = _udp_handlers.get(addr)
+    if handler is None:
+        return
+    handler, buffer_size = handler
+    if handler is not None:
+        handler('<test>', data[:buffer_size])

@@ -22,20 +22,20 @@ server:
     ...         pass
 
     >>> import zc.ngi.testing
-    >>> connector = zc.ngi.testing.peer('foo', EchoServer)
+    >>> connect = zc.ngi.testing.peer('foo', EchoServer)
 
 and we'll use the message client to send it a message and get a
 response.
-        
+
     >>> import zc.ngi.message
     >>> import re
     >>> expected = re.compile('\n').search
-    >>> zc.ngi.message.message(connector, 'foo', 'hello world!\n', expected)
+    >>> zc.ngi.message.message(connect, 'foo', 'hello world!\n', expected)
     'HELLO WORLD!\n'
 
 If we give an invalid address, we'll get an exception:
 
-    >>> zc.ngi.message.message(connector, 'bar', 'hello world!\n', expected)
+    >>> zc.ngi.message.message(connect, 'bar', 'hello world!\n', expected)
     Traceback (most recent call last):
     ...
     CouldNotConnect: connection refused

@@ -36,7 +36,7 @@ def test_async_cannot_connect():
     ...         lock.release()
 
     >>> def connect(addr):
-    ...     zc.ngi.async.connector(addr, Handler())
+    ...     zc.ngi.async.connect(addr, Handler())
     ...     lock.acquire()
 
     We find an unused port (so when we connect to it, the connection
@@ -48,13 +48,13 @@ def test_async_cannot_connect():
 
     >>> connect(('localhost', port))
     failed
-    
+
     """
 
 class BrokenConnect:
 
     connected = failed_connect = __call__ = lambda: xxxxx
-    
+
 class BrokenAfterConnect:
 
     def connected(self, connection):
@@ -71,37 +71,37 @@ def async_evil_setup(test):
     # errors are logged.
     #import logging
     #logging.getLogger().addHandler(logging.StreamHandler())
-    
+
     # See if we can break the main loop before running the async test
-    
+
     # Connect to bad port with bad handler
 
     port = zc.ngi.wordcount.get_port()
     addr = 'localhost', port
-    zc.ngi.async.connector(addr, BrokenConnect())
+    zc.ngi.async.connect(addr, BrokenConnect())
 
     # Start the server and connect to a good port with a bad handler
 
     port = zc.ngi.wordcount.start_server_process(zc.ngi.async.listener)
     addr = 'localhost', port
-    zc.ngi.async.connector(addr, BrokenAfterConnect())
+    zc.ngi.async.connect(addr, BrokenAfterConnect())
 
     # Stop the server
-    zc.ngi.wordcount.stop_server_process(zc.ngi.async.connector, addr)
+    zc.ngi.wordcount.stop_server_process(zc.ngi.async.connect, addr)
 
     # Create a lister with a broken server and connect to it
     port = zc.ngi.wordcount.get_port()
     addr = 'localhost', port
     zc.ngi.async.listener(addr, BrokenConnect())
-    zc.ngi.async.connector(addr, BrokenAfterConnect())
+    zc.ngi.async.connect(addr, BrokenAfterConnect())
 
     # Create a lister with a broken Server handler and connect to it
     port = zc.ngi.wordcount.get_port()
     addr = 'localhost', port
     zc.ngi.async.listener(addr, BrokenAfterConnect())
-    zc.ngi.async.connector(addr, BrokenAfterConnect())
+    zc.ngi.async.connect(addr, BrokenAfterConnect())
 
-    
+
 def test_suite():
     return unittest.TestSuite([
         doctest.DocFileSuite(
@@ -110,6 +110,7 @@ def test_suite():
             'message.txt',
             'adapters.txt',
             'blocking.txt',
+            'async-udp.test',
             ),
         doctest.DocFileSuite(
             'async.txt',

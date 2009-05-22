@@ -14,12 +14,14 @@
 """Network Gateway Interface (NGI)
 
 The interfaces are split between "implementation" and "application"
-interfaces.  An implementation of the NGI provides IConnection,
-IConnector, and IListener. An application provides IConnectionHandler
-and one or both of IClientConnectHandler and IServer.
+interfaces.  An implementation of the NGI provides IImplementation,
+IConnection, IServerConnection, IServerControl, and IUDPServerControl.
+An TCP application provides IConnectionHandler and one or both of
+IClientConnectHandler and IServer. A UDP server application might
+provide IUDPHandler.
 
 The NGI is an event-based framework in the sense that applications
-register handlers that respond to input events.  There are 3 kinds of
+register handlers that respond to input events.  There are 4 kinds of
 handlers:
 
 - Input handlers receive network input and notification of connection
@@ -28,6 +30,8 @@ handlers:
 - Client-connect handlers respond to outbound connection events, and
 
 - Servers respond to incoming connection events.
+
+- UDP handlers respond to incoming UDP messages.
 
 The interfaces are designed to allow single-threaded applications:
 
@@ -54,19 +58,52 @@ $Id$
 
 from zope.interface import Interface, Attribute
 
+class IImplementation(Interface):
+    """Standard interface for ngi implementations
+    """
+
+    def connect(address, handler):
+        """Try to make a connection to the given address
+
+        The handler is an IClientConnectHandler.  The handler
+        connected method will be called with an IConnection object
+        if and when the connection succeeds or failed_connect method
+        will be called if the connection fails.
+        """
+
+    def listener(address, handler):
+        """Listen for incoming TCP connections
+
+        When a connection is received, call the handler.
+
+        An IListener object is returned.
+        """
+
+    def udp(address, message):
+        """Send a UDP message
+        """
+
+    def udp_listen(address, handler, buffer_size=4096):
+        """Listen for incoming UDP messages
+
+        When a message is received, call the handler with the message.
+
+        An IUDPListener object is returned.
+        """
+
 class IConnection(Interface):
     """Network connections
 
     This is an implementation interface.
-  
+
     Network connections support communication over a network
     connection, or any connection having separate input and output
-    channels. 
+    channels.
     """
 
     def __nonzero__():
         """Return the connection status
-        
+
         True is returned if the connection is open/active and
         False otherwise.
         """
@@ -85,15 +122,15 @@ class IConnection(Interface):
 
     def write(data):
         """Output a string to the connection.
-        
+
         The write call is non-blocking.
         """
 
     def writelines(data):
         """Output an iterable of strings to the connection.
-        
+
         The writelines call is non-blocking. Note, that the data may
-        not have been consumed when the method returns.        
+        not have been consumed when the method returns.
         """
 
     def close():
@@ -102,10 +139,10 @@ class IConnection(Interface):
 
 class IServerConnection(IConnection):
     """Server connection
-    
+
     This is an implementation interface.
     """
-    
+
     control = Attribute("An IServerControl")
 
 class IConnectionHandler(Interface):
@@ -121,28 +158,28 @@ class IConnectionHandler(Interface):
 
     def handle_input(connection, data):
         """Handle input data from a connection
-        
+
         The data is an 8-bit string.
 
         Note that there are no promises about blocking.  The data
         isn't necessarily record oriented.  For example, data could,
         in theory be passed one character at a time.  It is up to
         applications to organize data into records, if desired.
-        
+
         """
 
     def handle_close(connection, reason):
         """Receive notification that a connection has closed
-        
+
         The reason argument can be converted to a string for logging
         purposes.  It may have data useful for debugging, but this
         is undefined.
-        
+
         Notifications are received when the connection is closed
         externally, for example, when the other side of the
         connection is closed or in case of a network failure.  No
         notification is given when the connection's close method is
-        called.      
+        called.
         """
 
     def handle_exception(connection, exception):
@@ -154,21 +191,6 @@ class IConnectionHandler(Interface):
         writelines methods.
         """
 
-class IConnector(Interface):
-    """Create a connection to a server
-    
-    This is an implementation interface.
-    """
-
-    def __call__(address, handler):
-        """Try to make a connection to the given address
-        
-        The handler is an IClientConnectHandler.  The handler
-        connected method will be called with an IConnection object
-        if and when the connection succeeds or failed_connect method
-        will be called if the connection fails.
-        """
-
 class IClientConnectHandler(Interface):
     """Receive notifications of connection results
 
@@ -178,27 +200,13 @@ class IClientConnectHandler(Interface):
     def connected(connection):
         """Receive notification that a connection had been established
         """
-        
+
     def failed_connect(reason):
         """Receive notification that a connection could not be established
 
         The reason argument can be converted to a string for logging
         purposes.  It may have data useful for debugging, but this
         is undefined.
-        """
-
-class IListener(Interface):
-    """Listed for incoming connections
-    
-    This is an implementation interface.
-    """
-
-    def __call__(address, handler):
-        """Listen for incoming connections
-
-        When a connection is received, call the handler.
-
-        An IServerControl object is returned.
         """
 
 class IServer(Interface):
@@ -211,9 +219,21 @@ class IServer(Interface):
         """Handle a connection from a client
         """
 
-class IServerControl(Interface):
-    """Server information and close control
-    
+
+class IUDPHandler(Interface):
+    """Handle udp messages
+
+    This is an application interface.
+    """
+
+    def __call__(addr, data):
+        """Handle a connection from a client
+        """
+
+
+class IListener(Interface):
+    """Listener information and close control
+
     This is an implementation interface.
     """
 
@@ -234,12 +254,22 @@ class IServerControl(Interface):
         have been closed.
         """
 
+class IUDPListener(Interface):
+    """UDP Listener close control
+
+    This is an implementation interface.
+    """
+
+    def close():
+        """Close the listener
+        """
+
 class IBlocking(Interface):
     """Top-level blocking interface provided by the blocking module
     """
 
-    def connect(address, connector, timeout=None):
-        """Connect to the given address using the given connector
+    def connect(address, connect, timeout=None):
+        """Connect to the given address using the given connect callable
 
         A timout value may be given as a floating point number of
         seconds.
@@ -248,14 +278,14 @@ class IBlocking(Interface):
         an exception is raised.
         """
 
-    def open(connection_or_address, connector=None, timeout=None):
+    def open(connection_or_address, connect=None, timeout=None):
         """Get output and input files for a connection or address
 
         The first argument is either a connection or an address.
-        If (and only if) it is an address, then a connector must be
+        If (and only if) it is an address, then a connect callable must be
         provided as the second argument and a connection is gotten by
         calling the connect function with the given address,
-        connector, and timeout.
+        connect callable, and timeout.
 
         A pair of file-like objects is returned. The first is an
         output file-like object, an IBlockingOutput, for sending
@@ -287,7 +317,7 @@ class IBlockingPositionable(Interface):
         If whence is 2, the position is decreased by the offset.
 
         An exception is raised if the position is set to a negative
-        value. 
+        value.
         """
 
     def close():
@@ -363,8 +393,6 @@ class IBlockingInput(IBlockingPositionable):
         seconds to wait.  A zc.ngi.blocking.Timeout exception will be
         raised if the data cannot be read in the number of seconds given.
         """
-
-        
 
     def __iter__():
         """Return the input object
