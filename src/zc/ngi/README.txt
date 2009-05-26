@@ -473,7 +473,7 @@ ignored. This is UDP. :)
     >>> listener.close()
     >>> zc.ngi.testing.udp(('', 42), "hello")
 
-For a handler is used if you don't pass a handler:
+A default handler is used if you don't pass a handler:
 
     >>> listener = zc.ngi.testing.udp_listener(('', 43))
     >>> zc.ngi.testing.udp(('', 43), "hello")
