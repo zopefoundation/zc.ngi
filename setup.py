@@ -27,7 +27,7 @@ open('documentation.txt', 'w').write(long_description)
 name = 'zc.ngi'
 setup(
     name = name,
-    version = "1.0.1",
+    version = "1.1.0",
     author = "Jim Fulton",
     author_email = "jim@zope.com",
     description = "Network Gateway Interface",
