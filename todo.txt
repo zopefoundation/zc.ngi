@@ -7,3 +7,6 @@
 - Test handle_exception for blocking
 
 - Test we fail early when passing non-iterable to writelines
+
+- Document how to close blocking connections (call input.close(), go
+  figure)
