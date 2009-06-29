@@ -51,6 +51,16 @@ def test_async_cannot_connect():
 
     """
 
+def blocking_connector_handles_failed_connect():
+    """
+    >>> import zc.ngi.blocking
+    >>> zc.ngi.blocking.open(('localhost', 42), zc.ngi.testing.connect)
+    Traceback (most recent call last):
+    ...
+    ConnectionFailed: no such server
+
+    """
+
 class BrokenConnect:
 
     connected = failed_connect = __call__ = lambda: xxxxx

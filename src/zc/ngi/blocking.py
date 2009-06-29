@@ -34,7 +34,7 @@ class ConnectionTimeout(Timeout, ConnectionFailed):
 
 def connect(address, connect, timeout=None):
     return _connector().connect(address, connect, timeout)
-    
+
 class _connector:
 
     failed = connection = None
@@ -48,12 +48,12 @@ class _connector:
         if self.connection is not None:
             return self.connection
         raise ConnectionTimeout()
-    
+
     def connected(self, connection):
         self.connection = connection
         self.event.set()
 
-    def failed_connect(reason):
+    def failed_connect(self, reason):
         self.failed = reason
         self.event.set()
 
@@ -108,14 +108,14 @@ class OutputFile(_BaseFile):
         if not self._closed:
             self._connection.write(zc.ngi.END_OF_DATA)
         self._closed = True
-            
+
     def write(self, data):
         self._check_exception()
         self._check_open()
         assert isinstance(data, str)
         self._position += len(data)
         self._connection.write(data)
-            
+
     def writelines(self, data, timeout=None, nonblocking=False):
         self._check_exception()
         self._check_open()
@@ -178,7 +178,7 @@ class InputFile(_BaseFile):
         self._data += data
         condition.notifyAll()
         condition.release()
-        
+
     def handle_close(self, connection, reason):
         condition = self._condition
         condition.acquire()
@@ -306,6 +306,6 @@ class InputFile(_BaseFile):
             self._condition.wait()
 
         self._outputfile._check_exception()
-        
+
         return timeout, deadline
-        
+

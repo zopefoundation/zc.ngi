@@ -17,6 +17,14 @@ Changes
 *******
 
 ==================
+1.1.1 (2009-06-29)
+==================
+
+Bugs fixed:
+
+- zc.ngi.blocking didn't properly handle connection failures.
+
+==================
 1.1.0 (2009-05-26)
 ==================
 
