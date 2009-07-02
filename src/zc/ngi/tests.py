@@ -51,6 +51,12 @@ def test_async_cannot_connect():
 
     """
 
+def async_thread_has_name():
+    """
+    >>> len([t for t in threading.enumerate() if t.name == 'zc.ngi.async'])
+    1
+    """
+
 def blocking_connector_handles_failed_connect():
     """
     >>> import zc.ngi.blocking

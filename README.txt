@@ -17,6 +17,14 @@ Changes
 *******
 
 ==================
+1.1.2 (2009-07-02)
+==================
+
+Bugs fixed:
+
+- The zc.ngi.async thread wasn't named. All threads should be named.
+
+==================
 1.1.1 (2009-06-29)
 ==================
 

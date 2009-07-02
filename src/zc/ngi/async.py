@@ -593,6 +593,6 @@ def loop():
             logger.exception('loop error')
             raise
 
-_thread = threading.Thread(target=loop)
+_thread = threading.Thread(target=loop, name=__name__)
 _thread.setDaemon(True)
 _thread.start()
