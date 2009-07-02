@@ -53,7 +53,7 @@ def test_async_cannot_connect():
 
 def async_thread_has_name():
     """
-    >>> len([t for t in threading.enumerate() if t.name == 'zc.ngi.async'])
+    >>> len([t for t in threading.enumerate() if t.getName() == 'zc.ngi.async'])
     1
     """
 
