@@ -17,6 +17,16 @@ Changes
 *******
 
 ==================
+1.1.3 (2009-07-30)
+==================
+
+Bugs fixed:
+
+- zc.ngi.async bind failures weren't handled properly, causing lots of
+  annoying log messages to get spewed, which tesnded to fill up log
+  files.
+
+==================
 1.1.2 (2009-07-02)
 ==================
 

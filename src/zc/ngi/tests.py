@@ -67,6 +67,67 @@ def blocking_connector_handles_failed_connect():
 
     """
 
+def failure_to_bind_removes_listener_from_socket_map():
+    """
+    First, grab a port:
+
+    >>> import socket, random
+
+    >>> s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    >>> for i in range(1000):
+    ...    port = random.randint(10000, 30000)
+    ...    try: s.bind(('', port))
+    ...    except socket.error: pass
+    ...    else: break
+    ... else: print 'woops'
+
+    Get size of socket map:
+
+    >>> size = len(zc.ngi.async._map)
+
+    Now, trying to create a listener on the port should fail, and the
+    map should remain the same size.
+
+    >>> try: zc.ngi.async.listener(('', port), None)
+    ... except socket.error: pass
+    ... else: print 'oops'
+
+    >>> len(zc.ngi.async._map) == size
+    True
+
+    >>> s.close()
+
+    UDP:
+
+    >>> s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    >>> for i in range(1000):
+    ...    port = random.randint(10000, 30000)
+    ...    try: s.bind(('', port))
+    ...    except socket.error: pass
+    ...    else: break
+    ... else: print 'woops'
+
+    Get size of socket map:
+
+    >>> size = len(zc.ngi.async._map)
+
+    Now, trying to create a listener on the port should fail, and the
+    map should remain the same size.
+
+    >>> try: zc.ngi.async.udp_listener(('', port), None)
+    ... except socket.error: pass
+    ... else: print 'oops'
+
+    >>> len(zc.ngi.async._map) == size
+    True
+
+    >>> s.close()
+
+
+
+
+    """
+
 class BrokenConnect:
 
     connected = failed_connect = __call__ = lambda: xxxxx

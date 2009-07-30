@@ -362,10 +362,14 @@ class listener(BaseListener):
         else:
             family = socket.AF_INET
         self.create_socket(family, socket.SOCK_STREAM)
-        self.set_reuse_addr()
-        self.logger.info("listening on %r", self.addr)
-        self.bind(addr)
-        self.listen(255)
+        try:
+            self.set_reuse_addr()
+            self.logger.info("listening on %r", self.addr)
+            self.bind(addr)
+            self.listen(255)
+        except socket.error:
+            self.close()
+            raise
         notify_select()
 
     def handle_accept(self):
@@ -428,10 +432,14 @@ class udp_listener(BaseListener):
             family = socket.AF_UNIX
         else:
             family = socket.AF_INET
-        self.create_socket(family, socket.SOCK_DGRAM)
-        self.set_reuse_addr()
-        self.logger.info("listening on udp %r", self.addr)
-        self.bind(addr)
+        try:
+            self.create_socket(family, socket.SOCK_DGRAM)
+            self.set_reuse_addr()
+            self.logger.info("listening on udp %r", self.addr)
+            self.bind(addr)
+        except socket.error:
+            self.close()
+            raise
         notify_select()
 
     def handle_read(self):
