@@ -15,10 +15,13 @@
 
 $Id$
 """
-import threading, unittest
 from zope.testing import doctest
-import zc.ngi.testing
+import manuel.capture
+import manuel.doctest
+import manuel.testing
+import threading, unittest
 import zc.ngi.async
+import zc.ngi.testing
 import zc.ngi.wordcount
 
 def test_async_cannot_connect():
@@ -181,6 +184,10 @@ def async_evil_setup(test):
 
 def test_suite():
     return unittest.TestSuite([
+        manuel.testing.TestSuite(
+            manuel.doctest.Manuel() + manuel.capture.Manuel(),
+            'doc/index.txt',
+            ),
         doctest.DocFileSuite(
             'README.txt',
             'testing.test',

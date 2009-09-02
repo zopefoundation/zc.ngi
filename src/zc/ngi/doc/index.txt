@@ -1,0 +1,505 @@
+Introduction
+============
+
+Network programs are typically difficult to test because they require
+setting up network connections, clients, and servers.
+
+The Network Gateway Interface (NGI) seeks to improve this situation by
+separating application code from network code [#twisted]_.  NGI
+provides a layered architecture with plugable networking
+implementations. This allows application and network code to be tested
+independently and provides greater separation of concerns. A testing
+implementation supports testing application code without making
+network calls.
+
+NGI defines 2 groups of interfaces, application and implementation.
+Application interfaces are implemented by people writing applications
+using ngi. Implementation interfaces are written by back-end
+implementors.
+
+NGI is primary an asynchronous networking library.  Applications
+provide handlers that respond to network events.  The application
+interfaces definee these handlers:
+
+IConnectionHandler
+    Application component that handles TCP network input.
+
+IClientConnectHandler
+    Application component that handles successful or failed outgoing
+    TCP connections.
+
+IServer
+    Application callback to handle incoming connections.
+
+IUDPHandler
+    Application callback to handle incoming UDP messages.
+
+NGI also provides a synchronous API implemented on top of the
+asynchronous API.
+
+The implemention APIs provide (or mimic) low-level networking APIs:
+
+IImplementation
+    APIs for implementing and connecting to TCP servers and for
+    implementing and sending messages to UDP servers.
+
+IConnection
+    Network connection implementation.  This is the interface that
+    TCP applications interact with to actually get and send data.
+
+We'll look at these interfaces in more detail in the following sections.
+
+Connection Handlers
+===================
+
+The core application interface in NGI is IConnectionHandler.  It's an
+event-based API that's used to exchange data with a peer on the other
+side of a connection.  Let's look at a simple echo server that accepts
+input and sends it back after converting it to upper case::
+
+  class Echo:
+
+      def handle_input(self, conection, data):
+          connection.write(data.upper())
+
+      def handle_close(self, connection, reason):
+          print 'closed', reason
+
+      def handle_exception(self, connection, exception):
+          print 'oops', exception
+
+.. -> src
+
+    >>> exec(src)
+
+There are only 3 methods in the interface, 2 of which are optional.
+Each of the 3 methods takes a connection object, implementing
+``IConnection``.  Typically, connection handlers will call the write,
+writelines, or close methods from the handler's handle input method.
+The writelines [#writelines] method takes an iteraable object.
+
+The handler's handle_close and handle_exception methods are optional.
+The handle_exception method is only called if an iterator created from
+an iterable passed to writelines raises an exception.  If a call to
+handle_exception fails, an implementation will close the connection.
+
+The handle_close method is called when a connection is closed other
+than through the connection handler calling the connection's close
+method.  For many applications, this is uninteresting, which is why
+the method is optional.  Clients that maintain long-running
+conections, may try to create new connections when notified that a
+connection has closed.
+
+Testing connection handlers
+---------------------------
+
+Testing a connection handler is very easy.  Just call it's methods
+passing suitable arguments. The zc.ngi.testing module provides a
+connection implementation designed to make testing convenient.  For
+example, to test our Echo connection handler, we can use code like the
+following:
+
+    >>> import zc.ngi.testing
+    >>> connection = zc.ngi.testing.Connection()
+    >>> handler = Echo()
+    >>> handler.handle_input(connection, 'hello out there')
+    -> 'HELLO OUT THERE'
+
+Any data written to the connection, using it's write or writelines
+methods, is written to standard output preceeded by "-> ".
+
+    >>> handler.handle_close(connection, 'done')
+    closed done
+
+Imperative handlers using generators
+------------------------------------
+
+Let's look at a slightly more complicated example.  We'll implement
+simple word-count server connection handler that implements something
+akin to the Unix word-count command.  It takes a line of input
+containing a text length followed by length bytes of data.  After
+recieving the length bytes of data, it send back a line of data
+containing line, word, and character counts::
+
+  class WC:
+
+      input = ''
+      count = None
+
+      def handle_input(self, conection, data):
+          self.input += data
+
+          if self.count is None:
+              if '\n' not in self.input:
+                  return
+              count, self.input = self.input.split('\n', 1)
+              self.count = int(count)
+
+          if len(self.input) < self.count:
+              return
+
+          data = self.input[:self.count]
+          self.input = self.input[self.count:]
+          self.count = None
+          connection.write(
+              '%d %d %d\n' % (
+                 len(data.split('\n')), len(data.split()), len(data)
+                 ))
+
+.. -> src
+
+    >>> exec(src)
+
+    >>> handler = WC()
+    >>> connection = zc.ngi.testing.Connection()
+    >>> handler.handle_input(connection, '15')
+    >>> handler.handle_input(connection, '\nhello out\nthere')
+    -> '2 3 15\n'
+
+Here, we ommitted the optional handle_close and handle_exception
+methods.  The implementation is a bit complicated. We have to use
+instance variables to keep track of state between calls.  Note that we
+can't count on data coming in a line at a time or make any assumptions
+about the amount of data we'll recieve in a handle_input call.  The
+logic is complicated by the fact that we have two modes of collecting
+input. In the first mode, we're collecting a length. In the second
+mode, we're collecting input for analysis.
+
+Connection handlers can often be simplified by writing them as
+generators, using zc.ngi.generator.handler::
+
+    import zc.ngi.generator
+
+    @zc.ngi.generator.handler
+    def wc(connection):
+        input = ''
+        while 1:
+            while '\n' not in input:
+                input += (yield)
+            count, input = input.split('\n', 1)
+            count = int(count)
+            while len(input) < count:
+                input += (yield)
+            data = input[:count]
+            connection.write(
+                '%d %d %d\n' % (
+                   len(data.split('\n')), len(data.split()), len(data)
+                   ))
+            input = input[count:]
+
+.. -> src
+
+    >>> import sys
+    >>> if sys.version_info >= (2, 5):
+    ...     exec(src)
+    ... else:
+    ...     def wc(conection):
+    ...         connection.setHandler(WC())
+
+The generator takes a connection object and gets data via yield
+statements.  The yield statements can raise exceptions.  In
+particular, a GeneratorExit exception is raised when the connection is
+closed.  The yield statement will also (re)raise any exceptions raised
+by calling an iterator created from an iterable passed to writelines.
+
+A generator-based handler is instantiated by calling it with a
+connection object:
+
+    >>> handler = wc(connection)
+    >>> handler.handle_input(connection, '15')
+    >>> handler.handle_input(connection, '\nhello out\nthere')
+    -> '2 3 15\n'
+
+    >>> handler.handle_close(connection, 'done')
+
+Implementing servers
+====================
+
+Implementing servers is only slightly more involved that implementing
+connection handlers.  A server is just a callable that takes a
+connection.  It typically creates a connection handler and passes it
+to the connection's setHandler method.  We can create a server using
+the Echo conection handler::
+
+    def echo_server(connection):
+        connection.setHandler(Echo())
+
+.. -> src
+
+    >>> exec(src)
+
+Of course, it's simpler to just use a connection handler class as a
+server by calling setHandler in the constructor::
+The full echo server is::
+
+  class Echo:
+
+      def __init__(self, connection):
+          connection.setHandler(self)
+
+      def handle_input(self, connection, data):
+          connection.write(data.upper())
+
+      def handle_close(self, connection, reason):
+          print 'closed', reason
+
+      def handle_exception(self, connection, exception):
+          print 'oops', exception
+
+.. -> src
+
+    >>> exec(src)
+
+Note that handlers created from generators can be used as servers
+directly.
+
+To actually get connections, we have to register a server with a
+listener. NGI implentations provide listener functions that take a
+server and return listener objects.
+
+NGI implementations provide a listener method, that takes an address
+and a server.  When testing servers, we'll often use the
+``zc.ngi.testing.listener`` function:
+
+    >>> listener = zc.ngi.testing.listener('echo', Echo)
+
+Generally, the address will either be a host/port tuple or the name of
+a unix domain socket, although an implementation may define a custom
+address representation.  The ``zc.ngi.testing.listener`` function will
+take any hashable address object.
+
+We can connect to a testing listener using it's connect method:
+
+    >>> connection = listener.connect()
+
+The connection returned from listener.connect is not the connection
+passed to the server.  Instead, it's a test connection that we can use
+as if we're writing a client:
+
+    >>> connection.write('Hi\nthere.')
+    -> 'HI\nTHERE.'
+
+It is actually a peer of the connection passed to the server. Testing
+connections have peer attributes that you can use to get to the peer
+connection.
+
+    >>> connection.peer.peer is connection
+    True
+
+The test connection has a default handler that just prints data to
+standard output, but we can call setHandler on it to use a different
+handler:
+
+    >>> class Handler:
+    ...     def handle_input(self, connection, data):
+    ...         print 'got', `data`
+    >>> connection.setHandler(Handler())
+    >>> connection.write('take this')
+    got 'TAKE THIS'
+
+Listeners provide two methods for controlling servers.  The
+``connections`` method returns an iterator of open connections. The
+``close`` method is used to stop a server, immediately, or after current
+connections have been closed.  See the reference sections of the
+documentation for more information.
+
+Implementing clients
+====================
+
+Implementing clients is a little bit more involved than writing
+servers because in addition to handling connections, you have to
+initiate the connections in the first place.  This involves
+implementing client connect handlers.  You request a connection by
+calling an implementation's ``connect`` function, passing a connect
+handler.  The ``connected`` method is called if the connection suceeds
+and the ``failed_connect`` method is called if it fails.
+
+Let's implement a word-count client.  It will take a string and use a
+work-count server to get it's line, word, and character counts::
+
+  class WCClient:
+
+      def __init__(self, data):
+          self.data = data
+
+      def connected(self, connection):
+          connection.setHandler(LineReader())
+          connection.write(self.data)
+
+      def failed_connect(self, reason):
+          print 'failed', reason
+
+  class LineReader:
+
+      input = ''
+      def handle_input(self, connection, data):
+          self.input += data
+          if '\n' in self.input:
+             print 'LineReader got', self.input
+             connection.close()
+
+.. -> src
+
+    >>> exec(src)
+
+Testing client connect handlers
+-------------------------------
+
+We test client connect handlers the same way we test connection
+handlers and servers, by calling their methods:
+
+    >>> wcc = WCClient('Hello out\nthere')
+    >>> wcc.failed_connect('test')
+    failed test
+
+    >>> connection = zc.ngi.testing.Connection()
+    >>> wcc.connected(connection)
+    -> 'Hello out\nthere'
+
+In this example, the connect handler set the connection handler to an
+instance of LineReader and wrote the data to be analyzed to the
+connection.  We now want to send some test result data to the reader.  If
+we call the connection's write method, the data we pass will just be
+printed, as the data the connect handler passed to the connection
+write method was.  We want to play the role of the server. To do that,
+we need to get the test connection's peer and call it's write method:
+
+    >>> connection.peer.write('text from server\n')
+    LineReader got text from server
+    <BLANKLINE>
+    -> CLOSE
+
+Conbining connect handlers with connection handlers
+---------------------------------------------------
+
+A connect handler can be it's own connection handler:
+
+  class WCClient:
+
+      def __init__(self, data):
+          self.data = data
+
+      def connected(self, connection):
+          connection.setHandler(self)
+          connection.write(self.data)
+
+      def failed_connect(self, reason):
+          print 'failed', reason
+
+      input = ''
+      def handle_input(self, connection, data):
+          self.input += data
+          if '\n' in self.input:
+             print 'WCClient got', self.input
+             connection.close()
+
+.. -> src
+
+    >>> exec(src)
+
+    >>> wcc = WCClient('Line one\nline two')
+    >>> connection = zc.ngi.testing.Connection()
+    >>> wcc.connected(connection)
+    -> 'Line one\nline two'
+
+    >>> connection.peer.write('more text from server\n')
+    WCClient got more text from server
+    <BLANKLINE>
+    -> CLOSE
+
+and, of course, a generator can be used in the connected method:
+
+  class WCClientG:
+
+      def __init__(self, data):
+          self.data = data
+
+      @zc.ngi.generator.handler
+      def connected(self, connection):
+          connection.write(self.data)
+          input = ''
+          while '\n' not in input:
+              input += (yield)
+          print 'Got', input
+
+      def failed_connect(self, reason):
+          print 'failed', reason
+
+.. -> src
+
+    >>> if sys.version_info >= (2, 5):
+    ...     exec(src)
+    ...     wcc = WCClientG('first one\nsecond one')
+    ...     connection = zc.ngi.testing.Connection()
+    ...     _ = wcc.connected(connection)
+    ...     connection.peer.write('still more text from server\n')
+    -> 'first one\nsecond one'
+    Got still more text from server
+    <BLANKLINE>
+    -> CLOSE
+
+Conecting
+---------
+
+Implementations provide a ``connect`` method that takes an address and
+connect handler.  We'll often refer to the ``connect`` method as a
+"connector".  Applications that maintain long-running connections will
+often need to reconnect when conections are lost or retry cnectins
+when they fail.  In situations like this, we'll often pass a connect
+function to the application.
+
+When testing application connection logic, you'll typically create
+your own connector object.
+
+An important thing to note about making connections is that connector
+calls return immediately.  Connections are made and connection
+handlers are called in separate threads.  This means that you can have
+many outstading connect requests active at once.
+
+Blocking API
+============
+
+Event-based API's can be very convenient when implementing servers,
+and sometimes even when implementing clients.  In many cases though,
+simple clients can be problematic because, as mentioned in the
+previous section, calls to connectors are made in a separate thread. A
+call to an implementation's ``connect`` method returns immediately,
+before a connection is made and handled. A simple script that makes a
+single request to a server has to wait for a request to be completed
+before exiting.
+
+To support the common use case of a client that makes a single request
+(or finite number of requests) to a server, the ``zc.ngi.blocking``
+module provides a ``request`` function that makes a single request and
+blocks until the request has completed::
+
+    >>> import zc.ngi.blocking
+    >>> zc.ngi.blocking.request(zc.ngi.testing.connect, 'xxx', WCClient)
+
+The request function takes a connector, an address, and a connect
+handler. In the example above, we used the ``zc.ngi.testing``
+implementation's ``connect`` function as the connector.  The testing
+connector accepts any hashable object as an address.  By default,
+connections using the testing connector fail right away, as we saw
+above.
+
+
+
+connecting
+request
+threading
+udp
+----------------------
+
+Notes:
+
+- Maybe close should change to wait until data are sent
+- Maybe grow a close_now. Or some such. Or maybe grow a close_after_sent.
+- What about errors raised by handle_input?
+- Need to make sure we have tests of edge cases where there are errors
+  calling handler methods.
+- testing.listener doesn't use the address argument
+
+- Can we implement application connection retry logic wo threads?
+  Should we? Testing would be easier if the implementation provided
+  it. If conectors took a delay argument, then it would be easier to test.

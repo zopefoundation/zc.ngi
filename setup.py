@@ -38,8 +38,6 @@ long_description=(
         '**********************\n'
         )
 
-open('documentation.txt', 'w').write(long_description)
-
 setup(
     name = name, version=version,
     author = "Jim Fulton",
@@ -56,7 +54,7 @@ setup(
     namespace_packages = ['zc'],
     install_requires = ['setuptools'],
     extras_require = dict(
-        test = ['zope.testing'],
+        test = ['zope.testing', 'manuel'],
         ),
     zip_safe = False,
     )

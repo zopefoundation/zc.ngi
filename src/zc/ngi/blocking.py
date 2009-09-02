@@ -32,7 +32,69 @@ class ConnectionTimeout(Timeout, ConnectionFailed):
     """An attempt to connect timed out.
     """
 
-def connect(address, connect, timeout=None):
+class RequestConnection:
+
+    def __init__(self, connection, connector):
+        self.connection = connection
+        self.connector = connector
+
+    def write(self, data):
+        self.write = self.connection.write
+        self.write(data)
+
+    def writelines(self, data):
+        self.writelines = self.connection.writelines
+        self.writelines(data)
+
+    def close(self):
+        self.connection.close()
+        self.connector.closed = 'client'
+        self.connector.event.set()
+
+    def setHandler(self, handler):
+        self.handler = handler
+        self.handleInput = handler.handleInput
+        self.handle_exception = handler.handle_exception
+        self.connection.setHandler(self)
+
+    def handle_close(self, connection, reason):
+        self.connector.closed = reason
+        self.connector.event.set()
+
+class RequestConnector:
+
+    failed = closed = connection = None
+
+    def __init__(self, handler, event):
+        self.handler
+        self.event
+
+    def connected(self, connection):
+        self.connection = connection
+        connection = RequestConnection(connection, self)
+        self.handler.connected(connection)
+
+    def failed_connection(self, reason):
+        self.failed = reason
+        self.event.set()
+
+def request(address, connection_handler, connect=None, timeout=None):
+    if connect is None:
+        connect = zc.ngi.implementation.connect
+    event = threading.Event()
+    connector = RequestConnector(connection_handler, event)
+    event.wait(timeout)
+    if connector.closed is not None:
+        return connector.closed
+    if connector.failed is not None:
+        raise ConnectionFailed(connector.failed)
+    if connector.connection is None:
+        raise ConnectionTimeout
+    raise Timeout
+
+def connect(address, connect=None, timeout=None):
+    if connect is None:
+        connect = zc.ngi.implementation.connect
     return _connector().connect(address, connect, timeout)
 
 class _connector:
@@ -58,7 +120,8 @@ class _connector:
         self.event.set()
 
 def open(connection_or_address, connector=None, timeout=None):
-    if connector is None:
+    if connector is None and hasattr(connection_or_address, 'setHandler'):
+        # connection_or_address is a connection
         connection = connection_or_address
     else:
         connection = connect(connection_or_address, connector, timeout)

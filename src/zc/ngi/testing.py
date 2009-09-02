@@ -171,21 +171,29 @@ def connectable(addr, connection):
 
 class listener:
 
-    def __init__(self, handler):
+    def __init__(self, addr, handler=None):
+        if handler is None:
+            handler = addr
         self._handler = handler
         self._close_handler = None
         self._connections = []
 
-    def connect(self, connection, handler=None):
+    def connect(self, connection=None, handler=None):
         if handler is not None:
             # connection is addr in this case and is ignored
             handler.connected(Connection(None, self._handler))
             return
         if self._handler is None:
             raise TypeError("Listener closed")
+        if connection is None:
+            connection = Connection()
+            peer = connection.peer
+        else:
+            peer = None
         self._connections.append(connection)
         connection.control = self
         self._handler(connection)
+        return peer
 
     connector = connect
 
