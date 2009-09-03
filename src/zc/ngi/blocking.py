@@ -53,41 +53,58 @@ class RequestConnection:
 
     def setHandler(self, handler):
         self.handler = handler
-        self.handleInput = handler.handleInput
-        self.handle_exception = handler.handle_exception
         self.connection.setHandler(self)
+
+    def handle_input(self, connection, data):
+        self.handle_input = self.handler.hande_input
+        self.hande_input(connection, data)
 
     def handle_close(self, connection, reason):
         self.connector.closed = reason
         self.connector.event.set()
 
+    def handle_exception(self, connection, exception):
+        try:
+            self.handler.handle_exception(connection, exception)
+        except:
+            self.connector.exception = exception
+            raise
+
 class RequestConnector:
 
-    failed = closed = connection = None
+    exception = closed = connection = None
 
     def __init__(self, handler, event):
-        self.handler
-        self.event
+        try:
+            connected = handler.connected
+        except AttributeError:
+            if callable(handler):
+                connected = handler
+            elif getattr(handler, 'handle_input', None) is None:
+                raise
+            else:
+                connected = lambda connection: connection.setHandler(handler)
+
+        self._connected = connected
+        self.event = event
 
     def connected(self, connection):
         self.connection = connection
-        connection = RequestConnection(connection, self)
-        self.handler.connected(connection)
+        self._connected(RequestConnection(connection, self))
 
-    def failed_connection(self, reason):
-        self.failed = reason
+    def failed_connect(self, reason):
+        self.exception = ConnectionFailed(reason)
         self.event.set()
 
-def request(address, connection_handler, connect=None, timeout=None):
-    if connect is None:
-        connect = zc.ngi.implementation.connect
+def request(connect, address, connection_handler, timeout=None):
     event = threading.Event()
     connector = RequestConnector(connection_handler, event)
+    connect(address, connector)
     event.wait(timeout)
     if connector.closed is not None:
         return connector.closed
-    if connector.failed is not None:
-        raise ConnectionFailed(connector.failed)
+    if connector.exception:
+        raise connector.exception
     if connector.connection is None:
         raise ConnectionTimeout
     raise Timeout

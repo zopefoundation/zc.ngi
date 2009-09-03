@@ -475,6 +475,9 @@ blocks until the request has completed::
 
     >>> import zc.ngi.blocking
     >>> zc.ngi.blocking.request(zc.ngi.testing.connect, 'xxx', WCClient)
+    Traceback (most recent call last):
+    ...
+    ConnectionFailed: no such server
 
 The request function takes a connector, an address, and a connect
 handler. In the example above, we used the ``zc.ngi.testing``
@@ -485,10 +488,10 @@ above.
 
 
 
-connecting
 request
 threading
 udp
+adapters
 ----------------------
 
 Notes:
@@ -503,3 +506,6 @@ Notes:
 - Can we implement application connection retry logic wo threads?
   Should we? Testing would be easier if the implementation provided
   it. If conectors took a delay argument, then it would be easier to test.
+- exception hamdling needs more thought
+  - what exceptions get reported
+  - where?
