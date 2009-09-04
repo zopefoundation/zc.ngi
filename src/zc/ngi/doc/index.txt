@@ -253,22 +253,92 @@ The full echo server is::
 Note that handlers created from generators can be used as servers
 directly.
 
-To actually get connections, we have to register a server with a
-listener. NGI implentations provide listener functions that take a
-server and return listener objects.
+Finally, we have to listen for connections on an address by calling an
+implementation's listener method.  NGI comes with 2 implementations,
+an impplementation based on the standard asyncore module,
+zc.ngi.async, and a testing implementation, zc.ngi.testing.  To
+listen for real network connections on localhost port 8000, we'd use::
 
-NGI implementations provide a listener method, that takes an address
-and a server.  When testing servers, we'll often use the
+    >>> import zc.ngi.async
+
+    >>> address = 'localhost', 8000
+    >>> listener = zc.ngi.async.listener(address. Echo)
+
+.. test it
+
+    >>> exec(src)
+    >>> class EC:
+    ...     def connected(self, connection):
+    ...         connection.setHandler(self)
+    ...         conection.write('test data')
+    ...     input = ''
+    ...     def handle_input(self, connection, data):
+    ...         self.input += data
+    ...         if self.input == 'TEST DATA':
+    ...             print self.input
+    ...             connection.close()
+
+    >>> import zc.ngi.blocking
+    >>> zc.ngi.blocking.request(zc.ngi.async.connect, address, EC)
+
+The listener call returns immediately.  The servicing of requests is
+done in a separate daemon thread provided by ``zc.ngi.async``.
+
+Listener objects, returned from an impementation's listener function,
+provide methods for controlling servers.  The connections method
+returns an iterable of open connections to a server:
+
+    >>> list(listener.connections())
+    []
+
+We can stop listening by calling a listener's close method:
+
+    >>> listener.close()
+
+.. test it
+
+    >>> zc.ngi.blocking.request(zc.ngi.async.connect, address, EC)
+
+There's also a ``close_wait`` method that stops listening and waits
+for a given period of time for clients to finish on their own before
+closing them.
+
+NGI doesn't keep the main thread running
+----------------------------------------
+
+An important thing to note about NGI is that it doesn't provide
+support for maintaining the main application thread. The threads it
+creates for itself are "daemon" threads, meaning they don't keep an
+application running.  If a main program ended with an implentation's
+listener call. the program would likely exit before the listener had a
+chance to get and service any connections.
+
+It's up to us to keep an application running. Some frameworks provide
+a ``loop_forever`` call. The closest thing in NGI is::
+
+    import threading
+    event = Threading.Event()
+    event.wait()
+
+If you wanted to provide a way to gracefully shut down an application,
+you'd provide some communication channel, such as a signnal handler,
+that closed any listeners and then set the event blocking the main
+thread from executing.
+
+Testing servers
+---------------
+
+When testing servers, we'll often use the
 ``zc.ngi.testing.listener`` function:
 
-    >>> listener = zc.ngi.testing.listener('echo', Echo)
+    >>> listener = zc.ngi.testing.listener(address, Echo)
 
 Generally, the address will either be a host/port tuple or the name of
 a unix domain socket, although an implementation may define a custom
 address representation.  The ``zc.ngi.testing.listener`` function will
 take any hashable address object.
 
-We can connect to a testing listener using it's connect method:
+We can connect to a *testing* listener using it's connect method:
 
     >>> connection = listener.connect()
 
@@ -296,12 +366,6 @@ handler:
     >>> connection.setHandler(Handler())
     >>> connection.write('take this')
     got 'TAKE THIS'
-
-Listeners provide two methods for controlling servers.  The
-``connections`` method returns an iterator of open connections. The
-``close`` method is used to stop a server, immediately, or after current
-connections have been closed.  See the reference sections of the
-documentation for more information.
 
 Implementing clients
 ====================
