@@ -17,6 +17,15 @@ Changes
 *******
 
 ==================
+1.1.4 (2009-09-??)
+==================
+
+Bug fixed:
+
+- Spurious warnings sometimes occurred due to a race condition in
+  setting up servers.
+
+==================
 1.1.3 (2009-07-30)
 ==================
 

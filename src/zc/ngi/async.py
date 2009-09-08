@@ -340,7 +340,9 @@ class BaseListener(asyncore.dispatcher):
 
     def add_channel(self, map=None):
         # work around file-dispatcher bug
-        assert (map is None) or (map is _map)
+        if map is None:
+            return
+        assert (map is _map)
         asyncore.dispatcher.add_channel(self, _map)
 
     def handle_error(self):
@@ -370,6 +372,7 @@ class listener(BaseListener):
         except socket.error:
             self.close()
             raise
+        self.add_channel(_map)
         notify_select()
 
     def handle_accept(self):
@@ -440,6 +443,7 @@ class udp_listener(BaseListener):
         except socket.error:
             self.close()
             raise
+        self.add_channel(_map)
         notify_select()
 
     def handle_read(self):
