@@ -1,12 +1,12 @@
-- Test for blocking where there is some i/o before timeout.
 
-- Test for blocking where there is some i/o before success.
 
-- Test blocking timout on writelines and non-blocking option
 
-- Test handle_exception for blocking
+Notes/to-do:
 
-- Test we fail early when passing non-iterable to writelines
+- deal with testing addresses for async
 
-- Document how to close blocking connections (call input.close(), go
-  figure)
+- testing.listener doesn't use the address argument.
+  should be possible to set up a testing listener that a client can connect
+  to.
+
+- fix method nameing, deprecating camel-case methods

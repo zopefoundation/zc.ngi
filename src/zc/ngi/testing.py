@@ -67,8 +67,25 @@ class Connection:
                 method, args = self.queue.pop(0)
                 if self.closed and method != 'handle_close':
                     break
+
                 try:
-                    getattr(self.handler, method)(self, *args)
+                    try:
+                        handler = getattr(self.handler, method)
+                    except AttributeError:
+                        if method == 'handle_close':
+                            return # Optional method
+                        elif method == 'handle_exception':
+                            # Unhandled exception
+                            self.close()
+                            handler = getattr(self.handler, 'handle_close',
+                                              None)
+                            if handler is None:
+                                return
+                            args = self, 'unhandled exception'
+                        else:
+                            raise
+
+                    handler(self, *args)
                 except:
                     print "Error test connection calling connection handler:"
                     traceback.print_exc(file=sys.stdout)
@@ -156,13 +173,28 @@ class TextConnection(Connection):
         Connection.__init__(self, peer, handler)
 
 _connectable = {}
-
+_recursing = object()
 def connect(addr, handler):
     connections = _connectable.get(addr)
-    if connections:
-        handler.connected(connections.pop(0))
-    else:
-        handler.failed_connect('no such server')
+    if isinstance(connections, list):
+        if connections:
+            return handler.connected(connections.pop(0))
+    elif isinstance(connections, listener):
+        return handler.connected(connections.connect())
+    elif connections is _recursing:
+        print (
+            "For address, %r, a conenct handler called connect from a\n"
+            "failed_connect call."
+            % (addr, ))
+        del _connectable[addr]
+        return
+
+    _connectable[addr] = _recursing
+    handler.failed_connect('no such server')
+    try:
+        del _connectable[addr]
+    except KeyError:
+        pass
 
 connector = connect
 
@@ -174,6 +206,10 @@ class listener:
     def __init__(self, addr, handler=None):
         if handler is None:
             handler = addr
+            addr = None
+        else:
+            _connectable[addr] = self
+        self.address = addr
         self._handler = handler
         self._close_handler = None
         self._connections = []
@@ -201,6 +237,8 @@ class listener:
         return iter(self._connections)
 
     def close(self, handler=None):
+        if self.address is not None:
+            del _connectable[self.address]
         self._handler = None
         if handler is None:
             while self._connections:

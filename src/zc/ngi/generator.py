@@ -12,17 +12,33 @@
 #
 ##############################################################################
 
-class handler(object):
 
-    def __init__(self, func):
+def handler(func=None, connection_adapter=None):
+    if func is None:
+        return lambda func: Handler(func, connection_adapter)
+    return Handler(func, connection_adapter)
+
+class Handler(object):
+
+    def __init__(self, func, connection_adapter):
         self.func = func
+        self.connection_adapter = connection_adapter
 
     def __call__(self, *args):
+        if self.connection_adapter is not None:
+            args = args[:-1]+(self.connection_adapter(args[-1]), )
         return ConnectionHandler(self.func(*args), args[-1])
 
     def __get__(self, inst, class_):
         if inst is None:
             return self
+
+        if self.connection_adapter is not None:
+            def connected(connection):
+                connection = self.connection_adapter(connection)
+                return ConnectionHandler(self.func(inst, connection),
+                                         connection)
+            return connected
 
         return (lambda connection:
                 ConnectionHandler(self.func(inst, connection), connection)

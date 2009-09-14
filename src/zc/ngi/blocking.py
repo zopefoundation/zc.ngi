@@ -56,19 +56,19 @@ class RequestConnection:
         self.connection.setHandler(self)
 
     def handle_input(self, connection, data):
-        self.handle_input = self.handler.hande_input
-        self.hande_input(connection, data)
+        self.handler.handle_input(self, data)
 
     def handle_close(self, connection, reason):
+        handle_close = getattr(self.handler, 'handle_close', None)
+        if handle_close is not None:
+            handle_close(self, reason)
         self.connector.closed = reason
         self.connector.event.set()
 
-    def handle_exception(self, connection, exception):
-        try:
-            self.handler.handle_exception(connection, exception)
-        except:
-            self.connector.exception = exception
-            raise
+    @property
+    def handle_exception(self):
+        handle = self.handler.handle_exception
+        return lambda c, exception: handle(self, exception)
 
 class RequestConnector:
 

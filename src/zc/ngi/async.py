@@ -20,11 +20,9 @@ import asyncore
 import errno
 import logging
 import os
-import select
 import socket
 import sys
 import threading
-import time
 
 import zc.ngi
 
@@ -365,11 +363,31 @@ class listener(BaseListener):
         try:
             self.set_reuse_addr()
             self.logger.info("listening on %r", self.addr)
-            self.bind(addr)
+            if addr is None:
+                # Try to pick one, primarily for testing
+                import random
+                n = 0
+                while 1:
+                    port = random.randint(10000, 30000)
+                    addr = 'localhost', port
+                    try:
+                        self.bind(addr)
+                    except socket.error:
+                        n += 1
+                        if n > 100:
+                            raise
+                        else:
+                            continue
+                    break
+            else:
+                self.bind(addr)
+
             self.listen(255)
         except socket.error:
             self.close()
             raise
+
+        self.address = addr
         notify_select()
 
     def handle_accept(self):
@@ -410,7 +428,7 @@ class listener(BaseListener):
     def close(self, handler=None):
         self.accepting = False
         self.del_channel(_map)
-        self.socket.close()
+        call_from_thread(self.socket.close)
         if handler is None:
             for c in list(self.__connections):
                 c.handle_close("stopped")
@@ -418,6 +436,10 @@ class listener(BaseListener):
             handler(self)
         else:
             self.__close_handler = handler
+
+    # convenience method made possible by storaing out address:
+    def connect(self, handler):
+        connect(self.address, handler)
 
 class udp_listener(BaseListener):
 
@@ -448,7 +470,7 @@ class udp_listener(BaseListener):
 
     def close(self):
         self.del_channel(_map)
-        self.socket.close()
+        call_from_thread(self.socket.close)
 
 # udp uses GIL to get thread-safe socket management
 _udp_socks = {socket.AF_INET: [], socket.AF_UNIX: []}
@@ -472,6 +494,9 @@ class _Triggerbase(object):
 
     logger = logging.getLogger('zc.ngi.async.trigger')
 
+    def __init__(self):
+        self.callbacks = []
+
     def writable(self):
         return 0
 
@@ -483,15 +508,23 @@ class _Triggerbase(object):
         self.close()
 
     def handle_read(self):
+        while self.callbacks:
+            callback = self.callbacks.pop(0)
+            try:
+                callback()
+            except:
+                self.logger.exception('Calling callback')
+
         try:
             self.recv(BUFFER_SIZE)
         except socket.error:
-            return
+            pass
 
 if os.name == 'posix':
 
     class _Trigger(_Triggerbase, asyncore.file_dispatcher):
         def __init__(self):
+            _Triggerbase.__init__(self)
             self.__readfd, self.__writefd = os.pipe()
             asyncore.file_dispatcher.__init__(self, self.__readfd)
 
@@ -516,6 +549,7 @@ else:
 
     class _Trigger(_Triggerbase, asyncore.dispatcher):
         def __init__(self):
+            _Triggerbase.__init__(self)
 
             # Get a pair of connected sockets.  The trigger is the 'w'
             # end of the pair, which is connected to 'r'.  'r' is put
@@ -584,6 +618,10 @@ _trigger = _Trigger()
 
 notify_select = _trigger.pull_trigger
 
+def call_from_thread(func):
+    _trigger.callbacks.append(func)
+    notify_select()
+
 def loop():
     timeout = 30.0
     map = _map
@@ -598,6 +636,7 @@ def loop():
         try:
             asyncore.poll(timeout, map)
         except:
+            print sys.exc_info()[0]
             logger.exception('loop error')
             raise
 

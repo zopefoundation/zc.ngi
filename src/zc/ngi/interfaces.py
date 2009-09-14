@@ -69,6 +69,9 @@ class IImplementation(Interface):
         connected method will be called with an IConnection object
         if and when the connection succeeds or failed_connect method
         will be called if the connection fails.
+
+        This method os thread safe. It may be called by any thread at
+        any time.
         """
 
     def listener(address, handler):
@@ -77,18 +80,27 @@ class IImplementation(Interface):
         When a connection is received, call the handler.
 
         An IListener object is returned.
+
+        This method os thread safe. It may be called by any thread at
+        any time.
         """
 
     def udp(address, message):
         """Send a UDP message
+
+        This method is thread safe. It may be called by any thread at
+        any time.
         """
 
-    def udp_listen(address, handler, buffer_size=4096):
+    def udp_listener(address, handler, buffer_size=4096):
         """Listen for incoming UDP messages
 
         When a message is received, call the handler with the message.
 
         An IUDPListener object is returned.
+
+        This method os thread safe. It may be called by any thread at
+        any time.
         """
 
 class IConnection(Interface):
@@ -124,6 +136,9 @@ class IConnection(Interface):
         """Output a string to the connection.
 
         The write call is non-blocking.
+
+        This method os thread safe. It may be called by any thread at
+        any time.
         """
 
     def writelines(data):
@@ -131,10 +146,16 @@ class IConnection(Interface):
 
         The writelines call is non-blocking. Note, that the data may
         not have been consumed when the method returns.
+
+        This method os thread safe. It may be called by any thread at
+        any time.
         """
 
     def close():
         """Close the connection
+
+        This method os thread safe. It may be called by any thread at
+        any time.
         """
 
 class IServerConnection(IConnection):
@@ -236,6 +257,8 @@ class IListener(Interface):
 
     This is an implementation interface.
     """
+
+    address = Attribute("The address the listener is listening on.")
 
     def connections():
         """return an iterable of the current connections
