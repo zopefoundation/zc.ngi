@@ -6,7 +6,7 @@ setting up network connections, clients, and servers.
 
 The Network Gateway Interface (NGI) seeks to improve this situation by
 separating application code from network code [#twisted]_.  NGI
-provides a layered architecture with plugable networking
+provides a layered architecture with pluggable networking
 implementations. This allows application and network code to be tested
 independently and provides greater separation of concerns. A testing
 implementation supports testing application code without making
@@ -14,33 +14,33 @@ network calls.
 
 NGI defines 2 groups of interfaces, application and implementation.
 Application interfaces are implemented by people writing applications
-using ngi. Implementation interfaces are written by back-end
-implementors.
+using NGI. Implementation interfaces are written by back-end
+implementers.
 
 NGI is primary an asynchronous event-driven networking library.  Applications
 provide handlers that respond to network events.  The application
-interfaces definee these handlers:
+interfaces define these handlers:
 
-IConnectionHandler
+``IConnectionHandler``
     Application component that handles TCP network input
 
-IClientConnectHandler
+``IClientConnectHandler``
     Application component that handles successful or failed outgoing
     TCP connections
 
-IServer
+``IServer``
     Application callback to handle incoming connections
 
-IUDPHandler
+``IUDPHandler``
     Application callback to handle incoming UDP messages
 
-The implemention APIs provide (or mimic) low-level networking APIs:
+The implementation APIs provide (or mimic) low-level networking APIs:
 
-IImplementation
+``IImplementation``
     API for implementing and connecting to TCP servers and for
     implementing and sending messages to UDP servers.
 
-IConnection
+``IConnection``
     Network connection implementation.  This is the interface that
     TCP applications interact with to actually get and send data.
 
@@ -56,7 +56,7 @@ input and sends it back after converting it to upper case::
 
   class Echo:
 
-      def handle_input(self, conection, data):
+      def handle_input(self, connection, data):
           connection.write(data.upper())
 
       def handle_close(self, connection, reason):
@@ -74,7 +74,7 @@ Each of the 3 methods takes a connection object, implementing
 ``IConnection``.  Typically, connection handlers will call the
 ``write``, ``writelines``, or ``close`` methods from the handler's
 ``handle_input`` method.  The ``writelines`` [#writelines] method
-takes an iteraable object.
+takes an iterable object.
 
 The handler's ``handle_close`` and ``handle_exception`` methods are optional.
 The ``handle_exception`` method is only called if an iterator created from
@@ -85,7 +85,7 @@ The ``handle_close`` method is called when a connection is closed other
 than through the connection handler calling the connection's ``close``
 method.  For many applications, this is uninteresting, which is why
 the method is optional.  Clients that maintain long-running
-conections, may try to create new connections when notified that a
+connections, may try to create new connections when notified that a
 connection has closed.
 
 Testing connection handlers
@@ -104,7 +104,7 @@ following:
     -> 'HELLO OUT THERE'
 
 Any data written to the connection, using it's write or writelines
-methods, is written to standard output preceeded by "-> ".
+methods, is written to standard output preceded by "-> ".
 
     >>> handler.handle_close(connection, 'done')
     closed done
@@ -116,7 +116,7 @@ Let's look at a slightly more complicated example.  We'll implement
 a simple word-count server connection handler that implements something
 akin to the Unix ``wc`` command.  It takes a line of input
 containing a text length followed by length bytes of data.  After
-recieving the length bytes of data, it send back a line of data
+receiving the length bytes of data, it sends back a line of data
 containing line and word counts::
 
   class WC:
@@ -124,7 +124,7 @@ containing line and word counts::
       input = ''
       count = None
 
-      def handle_input(self, conection, data):
+      def handle_input(self, connection, data):
           self.input += data
 
           if self.count is None:
@@ -152,11 +152,11 @@ containing line and word counts::
     >>> handler.handle_input(connection, '\nhello out\nthere')
     -> '2 3\n'
 
-Here, we ommitted the optional handle_close and handle_exception
+Here, we omitted the optional handle_close and handle_exception
 methods.  The implementation is a bit complicated. We have to use
 instance variables to keep track of state between calls.  Note that we
 can't count on data coming in a line at a time or make any assumptions
-about the amount of data we'll recieve in a ``handle_input`` call.
+about the amount of data we'll receive in a ``handle_input`` call.
 The logic is further complicated by the fact that we have two modes of
 collecting input. In the first mode, we're collecting a length. In the
 second mode, we're collecting input for analysis.
@@ -187,7 +187,7 @@ generators, using the ``zc.ngi.generator.handler`` decorator::
     >>> if sys.version_info >= (2, 5):
     ...     exec(src)
     ... else:
-    ...     def wc(conection):
+    ...     def wc(connection):
     ...         connection.setHandler(WC())
 
 The generator takes a connection object and gets data via ``yield``
@@ -251,7 +251,7 @@ Listening for connections
 -------------------------
 
 Finally, we have to listen for connections on an address by calling an
-implementation's ``istener`` method.  NGI comes with 2 implementations
+implementation's ``listener`` method.  NGI comes with 2 implementations
 [#twistedimplementations]_, an implementation based on the ``asyncore``
 module from the standard library, ``zc.ngi.async``, and a testing
 implementation, ``zc.ngi.testing``.  To listen for network
@@ -260,23 +260,23 @@ connections on ``localhost`` port ``8000```, we'd use::
     >>> import zc.ngi.async
 
     >>> address = 'localhost', 8000
-
-.. let the listener pick the address
-
-    >>> address = None
-
-::
-
     >>> listener = zc.ngi.async.listener(address, Echo)
 
-.. test it
+.. -> src
+
+    Serious hi jinks here. :) The above doctest only *looks* like a
+    doctest. We actually turn it into Python code and exec it below.
+    We do this so we can replace the code that sets address to set it
+    to None so that the listener will just pick an available address.
+
+    >>> exec(src.replace('>>> ', '').replace("'localhost', 8000", 'None'))
 
     >>> import logging, sys
     >>> loghandler = logging.StreamHandler(sys.stdout)
     >>> logging.getLogger('zc.ngi').addHandler(loghandler)
     >>> logging.getLogger('zc.ngi').setLevel(logging.ERROR)
 
-    Echo's handle_close is problematic when using async, dur to timing
+    Echo's handle_close is problematic when using async, due to timing
     uncertainty.
 
     >>> Echo.handle_close = lambda *args: None
@@ -308,7 +308,7 @@ The listener call immediately returns a listener object.  The
 servicing of requests is done in a separate daemon thread provided by
 ``zc.ngi.async``.
 
-Listener objects, returned from an impementation's ``listener`` method,
+Listener objects, returned by an implementation's ``listener`` method,
 provide methods for controlling listeners.  The connections method
 returns an iterable of open connections to a server:
 
@@ -341,7 +341,7 @@ An important thing to note about NGI is that it doesn't provide
 support for maintaining the main application thread. The threads it
 creates for itself are "daemon" threads, meaning they don't keep an
 application running when the main thread exists.  If a main program
-ended with an implentation's listener call. the program would likely
+ended with an implantation's listener call. the program would likely
 exit before the listener had a chance to get and service any
 connections.
 
@@ -353,7 +353,7 @@ a ``loop_forever`` call. The closest thing in NGI is::
     event.wait()
 
 If you wanted to provide a way to gracefully shut down an application,
-you'd provide some communication channel, such as a signnal handler,
+you'd provide some communication channel, such as a signal handler,
 that closed any listeners and then set the event blocking the main
 thread from exiting.
 
@@ -366,7 +366,7 @@ When testing servers, we'll often use the
     >>> listener = zc.ngi.testing.listener(address, Echo)
 
 Generally, the address will either be a host/port tuple or the name of
-a unix domain socket, although an implementation may define a custom
+a Unix domain socket, although an implementation may define a custom
 address representation.  The ``zc.ngi.testing.listener`` function will
 take any hashable address object.
 
@@ -391,7 +391,7 @@ connection.
     True
 
 The test connection has a default handler that just prints data to
-standard output, but we can call setHandler on it to use a different
+standard output, but we can call ``setHandler`` on it to use a different
 handler:
 
     >>> class Handler:
@@ -417,7 +417,7 @@ initiate the connections in the first place.  This involves
 implementing client connect handlers.  You request a connection by
 calling an implementation's ``connect`` function, passing an address
 and a connect handler.  The handler's ``connected`` method is called
-if the connection suceeds and the handler's ``failed_connect`` method
+if the connection succeeds and the handler's ``failed_connect`` method
 is called if it fails.
 
 Let's implement a word-count client.  It will take a string and use a
@@ -463,7 +463,7 @@ handlers and servers, by calling their methods:
     -> 'Hello out\nthere'
 
 In this example, the connect handler set the connection handler to an
-instance of LineReader and wrote the data to be analyzed to the
+instance of ``LineReader`` and wrote the data to be analyzed to the
 connection.  We now want to send some test result data to the reader.  If
 we call the connection's write method, the data we pass will just be
 printed, as the data the connect handler passed to the connection
@@ -475,7 +475,7 @@ we need to get the test connection's peer and call it's write method:
     <BLANKLINE>
     -> CLOSE
 
-Conbining connect handlers with connection handlers
+Combining connect handlers with connection handlers
 ---------------------------------------------------
 
 A connect handler can be it's own connection handler::
@@ -578,7 +578,7 @@ We'll see the same behavior with the ``zc.ngi.async`` implementation:
 
     >>> listener = zc.ngi.async.listener(address, wc)
 
-.. use the listener's address
+.. use the listener address
 
     >>> address = listener.address
 
@@ -593,16 +593,16 @@ We'll see the same behavior with the ``zc.ngi.async`` implementation:
 
 Note that we use the time.sleep call above to wait for the connection
 to happen and run it's course.  This is needed for the ``async``
-because we're using real sockets and threads and there may be some
-small delay between when we rerquest the connection and when it
-happens. This isn't a problem with the testing implementation because
-the connection suceeds or fails right away and the implementation
-doesn't use a separate thread.
+implementation because we're using real sockets and threads and there
+may be some small delay between when we request the connection and
+when it happens. This isn't a problem with the testing implementation
+because the connection succeeds or fails right away and the
+implementation doesn't use a separate thread.
 
 We'll often refer to the ``connect`` method as a "connector".
 Applications that maintain long-running connections will often need to
-reconnect when conections are lost or retry cnectins when they fail.
-In situations like this, we'll often pass a connector to the
+reconnect when connections are lost or retry connections when they
+fail.  In situations like this, we'll often pass a connector to the
 application so that it can reconnect or retry a connection when
 needed.
 
@@ -611,8 +611,8 @@ Testing connection logic
 
 When testing application connection logic, you'll typically create
 your own connector object. This is especially important if
-applications reconnect when a connextion is lost or fails.  Let's look
-at an example.  Here's a cient application that does nothing but try
+applications reconnect when a connection is lost or fails.  Let's look
+at an example.  Here's a client application that does nothing but try
 to stay connected::
 
     class Stay:
@@ -670,7 +670,7 @@ If the connection fails, the ``Stay`` handler will try it again:
     >>> connect_handler is handler
     True
 
-If it suceeds and then is closed, the ``Stay`` connection handler will
+If it succeeds and then is closed, the ``Stay`` connection handler will
 reconnect:
 
     >>> connection = zc.ngi.testing.Connection()
@@ -687,13 +687,13 @@ reconnect:
     True
 
 The ``zc.ngi.testing`` module provides a test connector. If a listener
-is registered, then connections to it will succeed, otherwise they
+is registered, then connections to it will succeed, otherwise it
 will fail.  It will raise an exception if it's called in response to a
-failed_connect call to prevent infitite loops:
+failed_connect call to prevent infinite loops:
 
     >>> _ = Stay(('', 8000), zc.ngi.testing.connect)
     failed connect no such server
-    For address, ('', 8000), a conenct handler called connect from a
+    For address, ('', 8000), a connect handler called connect from a
     failed_connect call.
 
 Connectors return immediately
@@ -702,14 +702,14 @@ Connectors return immediately
 An important thing to note about making connections is that connector
 calls return immediately.  Connections are made and connection
 handlers are called in separate threads.  This means that you can have
-many outstading connect requests active at once.  It also means that,
+many outstanding connect requests active at once.  It also means that,
 as with servers, it is your responsibility to keep client programs
-runing while handlers are doing their work.
+running while handlers are doing their work.
 
 Blocking Client Requests
 ------------------------
 
-Event-based API's can be very convenient when implementing servers,
+Event-based APIs can be very convenient when implementing servers,
 and sometimes even when implementing clients.  In many cases though,
 simple clients can be problematic because, as mentioned in the
 previous section, calls to connectors are made in a separate thread. A
@@ -744,7 +744,7 @@ starting a listener:
 
     >>> listener = zc.ngi.async.listener(address, wc)
 
-.. Use the picked address
+.. use the listener's address
 
     >>> address = listener.address
 
@@ -757,13 +757,17 @@ starting a listener:
 
     >>> listener.close()
 
+The output includes ``'client'``.  The ``request`` function returns
+the reason the request ended.  The ``'client'`` string indicates the
+client closed the connection.
+
 The ``zc.ngi.blocking`` module has some other APIs for writing
 blocking network programs in an imperative style.  These were written
 before ``zc.ngi.generator`` and ``zc.ngi.blocking.request``. Now
-``zc.ngi.generator`` allows handlers to be written in an imperitive
+``zc.ngi.generator`` allows handlers to be written in an imperative
 style without giving up the advantages, especially for testing, of
 reactive handlers.  The ``zc.ngi.blocking.request`` function now
-makes it easy for simple client pograms to wait for requests to
+makes it easy for simple client programs to wait for requests to
 complete.  For these reasons, the older blocking APIs are now
 deprecated.
 
@@ -783,7 +787,7 @@ used a sized-message protocol.  A common pattern in NGI is to separate
 low-level protocol handling into a separate component using a
 connection adapter.  When we get a connection, we wrap it with an
 adapter to perform the low-level processing.  Here's an adapter that
-deals with the handling of sized messages for the wordcount example::
+deals with the handling of sized messages for the word-count example::
 
     class Sized:
 
@@ -847,8 +851,8 @@ word-count server:
 
 We can also use adapters with generator-based handlers by passing an
 adapter factory to ``zc.ngi.generator.handler`` using the
-``connection_adapter`` keyword argument. Here's the generator version of ther
-word count server using an adapter::
+``connection_adapter`` keyword argument. Here's the generator version
+of the word count server using an adapter::
 
     @zc.ngi.generator.handler(connection_adapter=Sized)
     def wcadapted(connection):
@@ -877,11 +881,11 @@ The ``zc.ngi.adapters`` module provides 2 connection adapters:
 ``Lines``
      The ``Lines`` adapter splits input data into records terminated
      new-line characters.  Records are passed to applications without
-     the terminnating new-line characters.
+     the terminating new-line characters.
 
 ``Sized``
      The ``Sized`` connection adapter support sized input and output
-     records.  Each record is preceeded by a 4-byte big-endian record
+     records.  Each record is preceded by a 4-byte big-endian record
      size.  Application's handle_input methods are called with
      complete records, with the size prefix removed. The adapted
      connection ``write`` (or ``writelines``) methods take records (or
@@ -895,9 +899,9 @@ messages by calling an implementation's ``udp`` method:
 
     >>> zc.ngi.testing.udp(('', 8000), 'hello udp')
 
-If there isn't a udp listener registered, then nothing will happen.
+If there isn't a UDP listener registered, then nothing will happen.
 
-You can also listen for udp requests by registering a callable with an
+You can also listen for UDP requests by registering a callable with an
 implementation's ``udp_listener``:
 
     >>> def handle(addr, s):
@@ -912,20 +916,24 @@ implementation's ``udp_listener``:
 Threading
 =========
 
-NGI tries ro accomodate threaded applications without imposing
+NGI tries to accommodate threaded applications without imposing
 thread-safety requirements.
 
-- Implementation (IImplementation) methods ``connect``, ``listener``,
+- Implementation (``IImplementation``) methods ``connect``, ``listener``,
   ``udp`` and ``udp_listener`` are thread safe. They may be called at
   any time by any thread.
 
-- Connection (IConnection) methods ``write``, ``writelines``, and
+- Connection (``IConnection``) methods ``write``, ``writelines``, and
   ``close`` are  thread safe. They may be called at
   any time by any thread.
 
   The connection setHandler method must only be called in a connect
   handler's ``connected`` method or a connection handler's
   ``handle_input`` method.
+
+- Listener (``IListener``) methods ``connections`` and ``close`` are
+  thread safe.  They may be called at
+  any time by any thread.
 
 - Application handler methods need not be thread safe.  NGI
   implementations will never call them from more than one thread at a
@@ -935,7 +943,7 @@ thread-safety requirements.
 
 .. [#twisted] The Twisted networking framework also provides this
    separation. Twisted doesn't leverage this separation to provide a clean
-   testing invironment as NGI does, although it's likely that it will
+   testing environment as NGI does, although it's likely that it will
    in the future.
 
 .. [#twistedimplementations] A number of implementations based on

@@ -5,8 +5,18 @@ Notes/to-do:
 
 - deal with testing addresses for async
 
+- tests for adapters writelines
+
 - testing.listener doesn't use the address argument.
   should be possible to set up a testing listener that a client can connect
   to.
 
 - fix method nameing, deprecating camel-case methods
+
+- Reference docs in sphinx
+
+- call handle_exception when handle_input fails. (?)
+
+- Maybe add note on logging.
+
+- in ref section, talk about async thread control

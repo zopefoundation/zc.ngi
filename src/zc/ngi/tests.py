@@ -185,7 +185,7 @@ def async_evil_setup(test):
 def test_suite():
     return unittest.TestSuite([
         manuel.testing.TestSuite(
-            manuel.doctest.Manuel() + manuel.capture.Manuel(),
+            manuel.capture.Manuel() + manuel.doctest.Manuel(),
             'doc/index.txt',
             ),
         doctest.DocFileSuite(

@@ -183,7 +183,7 @@ def connect(addr, handler):
         return handler.connected(connections.connect())
     elif connections is _recursing:
         print (
-            "For address, %r, a conenct handler called connect from a\n"
+            "For address, %r, a connect handler called connect from a\n"
             "failed_connect call."
             % (addr, ))
         del _connectable[addr]
