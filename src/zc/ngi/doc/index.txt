@@ -1,5 +1,25 @@
-Introduction
-============
+
+Network Gateway Interface
+=========================
+
+Abstract
+--------
+
+The Network Gateway Interface provides:
+
+- the ability to test application networking code without use of
+  sockets, threads or subprocesses
+
+- clean separation of application code and low-level networking code
+
+- a fairly simple inheritence free set of networking APIs
+
+- an event-based framework that makes it easy to handle many
+  simultaneous connections while still supporting an imperative
+  programming style.
+
+Overview
+--------
 
 Network programs are typically difficult to test because they require
 setting up network connections, clients, and servers.
@@ -14,8 +34,7 @@ network calls.
 
 NGI defines 2 groups of interfaces, application and implementation.
 Application interfaces are implemented by people writing applications
-using NGI. Implementation interfaces are written by back-end
-implementers.
+using NGI. Implementation interfaces are used by application developers.
 
 NGI is primary an asynchronous event-driven networking library.  Applications
 provide handlers that respond to network events.  The application
@@ -34,7 +53,8 @@ interfaces define these handlers:
 ``IUDPHandler``
     Application callback to handle incoming UDP messages
 
-The implementation APIs provide (or mimic) low-level networking APIs:
+The implementation APIs provide (or mimic) low-level networking APIs
+and include:
 
 ``IImplementation``
     API for implementing and connecting to TCP servers and for
