@@ -256,6 +256,8 @@ class connector(dispatcher):
         _CONNECT_OK          = (0, errno.EISCONN)
 
     def __init__(self, addr, handler):
+        if not _thread:
+            start_thread()
         self.__handler = handler
         if isinstance(addr, str):
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -351,6 +353,8 @@ class listener(BaseListener):
     logger = logging.getLogger('zc.ngi.async.server')
 
     def __init__(self, addr, handler):
+        if not _thread:
+            start_thread()
         self.__handler = handler
         self.__close_handler = None
         self.__connections = {}
@@ -447,6 +451,8 @@ class udp_listener(BaseListener):
     connected = True
 
     def __init__(self, addr, handler, buffer_size=4096):
+        if not _thread:
+            start_thread()
         self.__handler = handler
         self.__buffer_size = buffer_size
         asyncore.dispatcher.__init__(self)
@@ -640,6 +646,16 @@ def loop():
             logger.exception('loop error')
             raise
 
-_thread = threading.Thread(target=loop, name=__name__)
-_thread.setDaemon(True)
-_thread.start()
+_thread = None
+_start_lock = threading.Lock()
+def start_thread(daemon=True):
+    global _thread
+    _start_lock.acquire()
+    try:
+        if _thread is not None:
+            return
+        _thread = threading.Thread(target=loop, name=__name__)
+        _thread.setDaemon(daemon)
+        _thread.start()
+    finally:
+        _start_lock.release()
