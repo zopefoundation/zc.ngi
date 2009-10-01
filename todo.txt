@@ -20,3 +20,6 @@ Notes/to-do:
 - Maybe add note on logging.
 
 - in ref section, talk about async thread control
+
+- On error when a server closed (a generator exited) by the client
+  remained connected and could cause errors on the server.
