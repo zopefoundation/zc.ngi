@@ -11,52 +11,14 @@
 # FOR A PARTICULAR PURPOSE.
 #
 ##############################################################################
-"""Network Gateway Interface (NGI)
 
-The interfaces are split between "implementation" and "application"
-interfaces.  An implementation of the NGI provides IImplementation,
-IConnection, IServerConnection, IServerControl, and IUDPServerControl.
-An TCP application provides IConnectionHandler and one or both of
-IClientConnectHandler and IServer. A UDP server application might
-provide IUDPHandler.
-
-The NGI is an event-based framework in the sense that applications
-register handlers that respond to input events.  There are 4 kinds of
-handlers:
-
-- Input handlers receive network input and notification of connection
-  closes and exceptions,
-
-- Client-connect handlers respond to outbound connection events, and
-
-- Servers respond to incoming connection events.
-
-- UDP handlers respond to incoming UDP messages.
-
-The interfaces are designed to allow single-threaded applications:
-
-- An implementation of the interfaces is not allowed to make multiple
-  simultaneous calls to the same application handler.  (Note that this
-  requirement does not extend across multiple implementations.
-  Theoretically, different implementations could call handlers at the
-  same time.)
-
-  Note that when an application calls setHandler on a connection, the
-  connection handler may have it's methods called immediately with
-  pending input or notifications.
-
-- All handler calls that are associated with a connection include the
-  connection as a parameter,  This allows a single handler object to
-  respond to events from multiple connections.
-
-Applications may be multi-threaded.  This means that implementations
-must be thread safe.  This means that, unless otherwise stated, calls
-into the implementation could be made at any time.
-
-$Id$
-"""
-
-from zope.interface import Interface, Attribute
+try:
+    from zope.interface import Interface, Attribute
+except ImportError:
+    class Interface:
+        pass
+    def Attribute(text):
+        return text
 
 class IImplementation(Interface):
     """Standard interface for ngi implementations
@@ -182,11 +144,10 @@ class IConnectionHandler(Interface):
 
         The data is an 8-bit string.
 
-        Note that there are no promises about blocking.  The data
-        isn't necessarily record oriented.  For example, data could,
-        in theory be passed one character at a time.  It is up to
-        applications to organize data into records, if desired.
-
+        Note that there are no promises about data organization.  The
+        data isn't necessarily record oriented.  For example, data
+        could, in theory be passed one character at a time.  It is up
+        to applications to organize data into records, if desired.
         """
 
     def handle_close(connection, reason):
@@ -285,144 +246,4 @@ class IUDPListener(Interface):
 
     def close():
         """Close the listener
-        """
-
-class IBlocking(Interface):
-    """Top-level blocking interface provided by the blocking module
-    """
-
-    def connect(address, connect, timeout=None):
-        """Connect to the given address using the given connect callable
-
-        A timout value may be given as a floating point number of
-        seconds.
-
-        If connection suceeds, an IConnection is returned, otherwise
-        an exception is raised.
-        """
-
-    def open(connection_or_address, connect=None, timeout=None):
-        """Get output and input files for a connection or address
-
-        The first argument is either a connection or an address.
-        If (and only if) it is an address, then a connect callable must be
-        provided as the second argument and a connection is gotten by
-        calling the connect function with the given address,
-        connect callable, and timeout.
-
-        A pair of file-like objects is returned. The first is an
-        output file-like object, an IBlockingOutput, for sending
-        output to the connection.  The second file-like object is an
-        input file-like object, an IBlockingInput, for reading data
-        from the connection.
-        """
-
-class IBlockingPositionable(Interface):
-    """File-like objects with file positions.
-
-    To mimic file objects, working seek and tell methods are provided
-    that report and manipulate pseudo file positions.  The file
-    position starts at zero and is advanced by reading or writing
-    data. It can be adjusted (pointlessly) by the seek method.
-    """
-
-    def tell():
-        """Return the current file position.
-        """
-
-    def seek(offset, whence=0):
-        """Reset the file position
-
-        If whence is 0, then the file position is set to the offset.
-
-        If whence is 1, the position is increased by the offset.
-
-        If whence is 2, the position is decreased by the offset.
-
-        An exception is raised if the position is set to a negative
-        value.
-        """
-
-    def close():
-        """Close the connection.
-        """
-
-class IBlockingOutput(IBlockingPositionable):
-    """A file-like object for sending output to a connection.
-    """
-
-    def flush():
-        """Do nothing.
-        """
-
-    def write(data):
-        """Write a string to the connection.
-
-        The function will return immediately.  The data may be queued.
-        """
-
-    def writelines(iterable, timeout=0, nonblocking=False):
-        """Write an iterable of strings to the connection.
-
-        By default, the call will block until the data from the
-        iterable has been consumed.  If a true value is passed to the
-        non-blocking keyword argument, then the function will return
-        immediately. The iterable will be consumed at some later time.
-
-        In (the default) blocking mode, a timeout may be provided to
-        limit the time that the call will block.  If the timeout
-        expires, a zc.ngi.blocking.Timeout excation will be raised.
-        """
-
-class IBlockingInput(IBlockingPositionable):
-    """A file-like object for reading input from a connection.
-    """
-
-    def read(size=None, timeout=None):
-        """Read data
-
-        If a size is specified, then that many characters are read,
-        blocking of necessary.  If no size is specified (or if size is
-        None), then all remaining input data are read.
-
-        A timeout may be specified as a floating point number of
-        seconds to wait.  A zc.ngi.blocking.Timeout exception will be
-        raised if the data cannot be read in the number of seconds given.
-        """
-
-    def readline(size=None, timeout=None):
-        """Read a line of data
-
-        If a size is specified, then the lesser of that many
-        characters or a single line of data are read, blocking of
-        necessary.  If no size is specified (or if size is None), then
-        a single line are read.
-
-        A timeout may be specified as a floating point number of
-        seconds to wait.  A zc.ngi.blocking.Timeout exception will be
-        raised if the data cannot be read in the number of seconds given.
-        """
-
-    def readlines(sizehint=None, timeout=None):
-        """Read multiple lines of data
-
-        If a sizehint is specified, then one or more lines of data are
-        returned whose total length is less than or equal to the size
-        hint, blocking if necessary. If no sizehint is specified (or
-        if sizehint is None), then the remainder of input, split into
-        lines, is returned.
-
-        A timeout may be specified as a floating point number of
-        seconds to wait.  A zc.ngi.blocking.Timeout exception will be
-        raised if the data cannot be read in the number of seconds given.
-        """
-
-    def __iter__():
-        """Return the input object
-        """
-
-    def next():
-        """Return a line of input
-
-        Raises StopIteration if there is no more input.
         """
