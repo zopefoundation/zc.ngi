@@ -83,7 +83,7 @@ class IImplementation(Interface):
         """Send a UDP message
         """
 
-    def udp_listen(address, handler, buffer_size=4096):
+    def udp_listener(address, handler, buffer_size=4096):
         """Listen for incoming UDP messages
 
         When a message is received, call the handler with the message.

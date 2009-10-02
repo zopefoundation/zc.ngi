@@ -21,6 +21,8 @@ import zc.ngi.testing
 import zc.ngi.async
 import zc.ngi.wordcount
 
+zc.ngi.async.start_thread()
+
 def test_async_cannot_connect():
     """Let's make sure that the connector handles connection failures correctly
 
