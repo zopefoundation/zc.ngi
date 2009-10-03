@@ -15,7 +15,9 @@
 
 $Id$
 """
-import threading, unittest
+import unittest
+import sys
+import threading
 from zope.testing import doctest
 import zc.ngi.testing
 import zc.ngi.async
@@ -150,6 +152,9 @@ def async_evil_setup(test):
     # errors are logged.
     #import logging
     #logging.getLogger().addHandler(logging.StreamHandler())
+
+    # clean up the map.
+    zc.ngi.async.cleanup_map()
 
     # See if we can break the main loop before running the async test
 
