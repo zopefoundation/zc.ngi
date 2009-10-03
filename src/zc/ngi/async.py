@@ -23,6 +23,7 @@ import os
 import socket
 import sys
 import threading
+import traceback
 
 import zc.ngi
 
@@ -100,9 +101,19 @@ class SelectImplementation:
             try:
                 asyncore.poll(timeout, map)
             except:
-                logger.exception('loop error')
+                traceback.print_exception(*sys.exc_info())
+                #logger.exception('loop error')
                 raise
 
+    def cleanup_map(self):
+        for c in self._map.values():
+            if isinstance(c, _Trigger):
+                continue
+            try:
+                del self._map[c.fileno()]
+            except KeyError:
+                pass
+            c.close()
 
 class dispatcher(asyncore.dispatcher):
 
@@ -172,14 +183,14 @@ class _Connection(dispatcher):
             self.logger.debug('write %r', data)
         assert isinstance(data, str) or (data is zc.ngi.END_OF_DATA)
         self.__output.append(data)
-        notify_select()
+        self.implementation.notify_select()
 
     def writelines(self, data):
         if __debug__:
             self.logger.debug('writelines %r', data)
         assert not isinstance(data, str), "writelines does not accept strings"
         self.__output.append(iter(data))
-        notify_select()
+        self.implementation.notify_select()
 
     def close(self):
         self.__connected = False
@@ -187,7 +198,7 @@ class _Connection(dispatcher):
         dispatcher.close(self)
         if self.control is not None:
             self.control.closed(self)
-        notify_select()
+        self.implementation.notify_select()
 
     def readable(self):
         return self.__handler is not None
@@ -292,7 +303,6 @@ class _Connection(dispatcher):
 
     def handle_expt(self):
         self.handle_close('socket error')
-
 
 class _Connector(dispatcher):
 
@@ -403,7 +413,8 @@ class BaseListener(asyncore.dispatcher):
 
     def handle_error(self):
         reason = sys.exc_info()[1]
-        self.logger.exception('listener error')
+        #self.logger.exception('listener error')
+        traceback.print_exception(*sys.exc_info())
         self.close()
 
 class _Listener(BaseListener):
@@ -431,7 +442,7 @@ class _Listener(BaseListener):
             self.close()
             raise
         self.add_channel(map)
-        notify_select()
+        self.implementation.notify_select()
 
     def handle_accept(self):
         if not self.accepting:
@@ -445,7 +456,8 @@ class _Listener(BaseListener):
                 # didn't get anything. Hm. Ignore.
                 return
         except socket.error, msg:
-            self.logger.exception("accepted failed: %s", msg)
+            traceback.print_exception(*sys.exc_info())
+            #self.logger.exception("accepted failed: %s", msg)
             return
         if __debug__:
             self.logger.debug('incoming connection %r', addr)
@@ -504,7 +516,7 @@ class _UDPListener(BaseListener):
             self.close()
             raise
         self.add_channel(map)
-        notify_select()
+        self.implementation.notify_select()
 
     def handle_read(self):
         message, addr = self.recvfrom(self.__buffer_size)
@@ -556,13 +568,15 @@ if os.name == 'posix':
     class _Trigger(_Triggerbase, asyncore.file_dispatcher):
         def __init__(self, map):
             _Triggerbase.__init__(self)
-            self.__readfd, self.__writefd = os.pipe()
-            asyncore.file_dispatcher.__init__(self, self.__readfd, map)
+            r, self.__writefd = os.pipe()
+            asyncore.file_dispatcher.__init__(self, r, map)
+
+            # file_dispatcher dups r, so we don't need it any more
+            os.close(r)
 
         def close(self):
-            self.del_channel(self._map)
             os.close(self.__writefd)
-            os.close(self.__readfd)
+            asyncore.file_dispatcher.close(self)
 
         def pull_trigger(self):
             if __debug__:
@@ -653,8 +667,8 @@ _select_implementation = SelectImplementation()
 call_from_thread = _select_implementation.call_from_thread
 connect = connector = _select_implementation.connect
 listener = _select_implementation.listener
-notify_select = _select_implementation.notify_select
 start_thread = _select_implementation.start_thread
 udp = _select_implementation.udp
 udp_listener = _select_implementation.udp_listener
 _map = _select_implementation._map
+cleanup_map = _select_implementation.cleanup_map
