@@ -12,8 +12,6 @@
 #
 ##############################################################################
 """Asyncore-based implementation of the NGI
-
-$Id$
 """
 
 import asyncore
