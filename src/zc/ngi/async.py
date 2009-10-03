@@ -394,9 +394,6 @@ class _Connector(dispatcher):
     def handle_expt(self):
         self.handle_close('connection failed')
 
-def connect(*args):
-    connector(*args)
-
 class BaseListener(asyncore.dispatcher):
 
     def writable(self):
