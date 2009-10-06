@@ -94,8 +94,7 @@ If we write a message, we can see that the message is preceded by the
 message size:
 
     >>> adapter.write(message1) 
-    -> '\x00\x00\x00\x19'
-    -> 'Hello\nWorld!\nHow are you?'
+    -> '\x00\x00\x00\x19Hello\nWorld!\nHow are you?'
    
 Null messages
 -------------
