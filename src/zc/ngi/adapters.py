@@ -23,6 +23,7 @@ class Lines:
         self.connection = connection
         self.close = connection.close
         self.write = connection.write
+        self.writelines = connection.writelines
 
     def setHandler(self, handler):
         self.handler = handler

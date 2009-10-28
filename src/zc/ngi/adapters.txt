@@ -18,7 +18,7 @@ prints its input:
     >>> import zc.ngi.testing
     >>> connection = zc.ngi.testing.Connection()
     >>> handler = zc.ngi.testing.PrintingHandler(connection)
- 
+
 This handler is used by default as the peer
 of testing connections:
 
@@ -53,6 +53,10 @@ as would the underlying connection:
     >>> adapter.write('foo')
     -> 'foo'
 
+    >>> adapter.writelines(['foo', 'bar'])
+    -> 'foo'
+    -> 'bar'
+
     >>> connection.test_close('test')
     -> CLOSE test
 
@@ -76,7 +80,7 @@ To see this, we'll use the adapter to adapt a testing connection:
 
 Now, we'll generate some input. We do so by providing (big-endian) sizes by
 calling struct pack:
-    
+
     >>> import struct
     >>> message1 = 'Hello\nWorld!\nHow are you?'
     >>> message2 = 'This is message 2'
@@ -93,10 +97,10 @@ Here we saw that our handler got the two messages individually.
 If we write a message, we can see that the message is preceded by the
 message size:
 
-    >>> adapter.write(message1) 
+    >>> adapter.write(message1)
     -> '\x00\x00\x00\x19'
     -> 'Hello\nWorld!\nHow are you?'
-   
+
 Null messages
 -------------
 
@@ -113,8 +117,10 @@ sent to the application:
 
     >>> connection.test_input('\xff\xff\xff\xff')
 
+Closing
+-------
 
- 
+Closing works too.
 
-
-
+    >>> connection.test_close('test')
+    -> CLOSE test

@@ -17,13 +17,14 @@ Changes
 *******
 
 ==================
-1.1.4 (2009-09-??)
+1.1.4 (2009-10-??)
 ==================
 
 Bug fixed:
 
 - Spurious warnings sometimes occurred due to a race condition in
   setting up servers.
+- Added missing "writelines" method to zc.ngi.adapters.Lines.
 
 ==================
 1.1.3 (2009-07-30)
