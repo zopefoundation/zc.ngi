@@ -29,6 +29,7 @@ import time
 import zc.ngi
 
 pid = os.getpid()
+is_win32 = sys.platform == 'win32'
 
 _map = {}
 _connectors = {}
@@ -455,7 +456,10 @@ class udp_listener(BaseListener):
         self.socket.close()
 
 # udp uses GIL to get thread-safe socket management
-_udp_socks = {socket.AF_INET: [], socket.AF_UNIX: []}
+if is_win32:
+    _udp_socks = {socket.AF_INET: []}
+else:
+    _udp_socks = {socket.AF_INET: [], socket.AF_UNIX: []}
 def udp(address, message):
     if isinstance(address, str):
         family = socket.AF_UNIX
