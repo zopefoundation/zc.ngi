@@ -17,6 +17,15 @@ Changes
 *******
 
 ==================
+1.1.5 (unreleased)
+==================
+
+Bug fixed:
+
+- Fixed a fatal win32 problem (socket.AF_UNIX usage)
+  (still 2 test failures on win32) other than that it works fine on win32
+  
+==================
 1.1.4 (2009-10-28)
 ==================
 
