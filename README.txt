@@ -22,8 +22,9 @@ Changes
 
 Bug fixed:
 
-- Fixed a fatal win32 problem (socket.AF_UNIX usage)
-  (still 2 test failures on win32) other than that it works fine on win32
+- Fixed a fatal win32 problem (socket.AF_UNIX usage).
+
+- Removed impropper use of the SO_REUSEADDR socket option on windows.
 
 ==================
 1.1.4 (2009-10-28)
