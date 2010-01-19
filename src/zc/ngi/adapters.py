@@ -91,6 +91,4 @@ class Sized:
         if message is None:
             self.connection.write('\xff\xff\xff\xff')
         else:
-            self.connection.write(struct.pack(">I", len(message)))
-            self.connection.write(message)
-    
+            self.connection.write(struct.pack(">I", len(message))+message)
