@@ -26,6 +26,10 @@ Bug fixed:
 
 - Removed impropper use of the SO_REUSEADDR socket option on windows.
 
+- The sized adapter performed poorly (because it triggered Nagle's
+  algorithm).
+
+
 ==================
 1.1.4 (2009-10-28)
 ==================
