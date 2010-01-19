@@ -599,9 +599,10 @@ def loop():
     map = _map
     connectors = _connectors
     logger = logging.getLogger('zc.ngi.async.loop')
+    list_ = list
 
     while map:
-        for f in list(connectors):
+        for f in list_(connectors):
             c = connectors.pop(f)
             c.connect()
 
