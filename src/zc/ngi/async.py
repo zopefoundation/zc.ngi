@@ -366,7 +366,7 @@ class listener(BaseListener):
             family = socket.AF_INET
         self.create_socket(family, socket.SOCK_STREAM)
         try:
-            if sys.platform != 'win32':
+            if not is_win32:
                 self.set_reuse_addr()
             self.logger.info("listening on %r", self.addr)
             self.bind(addr)
@@ -439,7 +439,7 @@ class udp_listener(BaseListener):
             family = socket.AF_INET
         try:
             self.create_socket(family, socket.SOCK_DGRAM)
-            if sys.platform != 'win32':
+            if not is_win32:
                 self.set_reuse_addr()
             self.logger.info("listening on udp %r", self.addr)
             self.bind(addr)
