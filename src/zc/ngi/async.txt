@@ -215,3 +215,27 @@ Check logging
 
     >>> listener.close()
     >>> time.sleep(0.1)
+
+
+Trying to rebind to a port in use:
+
+    >>> loghandler.clear()
+
+    >>> listener = zc.ngi.async.listener(('127.0.0.1', 9645), handler)
+    >>> time.sleep(0.1)
+
+    >>> listener2 = zc.ngi.async.listener(('127.0.0.1', 9645), handler)
+    Traceback (most recent call last):
+    ...
+    error: (98, 'Address already in use')
+    >>> time.sleep(0.1)
+
+    >>> logcontent = str(loghandler)
+    >>> print logcontent # doctest: +ELLIPSIS
+    zc.ngi.async.server INFO
+      listening on ('127.0.0.1', 9645)
+    zc.ngi.async.server WARNING
+      unable to listen on ('127.0.0.1', 9645)
+
+    >>> listener.close()
+    >>> time.sleep(0.1)

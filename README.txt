@@ -25,6 +25,11 @@ Bug fixed:
 - Fixed bad logging of ``listening on ...`` for ``listener``
   and ``udp_listener``.
 
+- Fixed bad logging of ``listening on ...``. The messge was emitted
+  before the actual operation was successful.
+  Emits now a warning ``unable to listen on...`` if binding to the given
+  address fails.
+
 ==================
 1.1.5 (2010-01-19)
 ==================
