@@ -368,7 +368,7 @@ class listener(BaseListener):
         try:
             if not is_win32:
                 self.set_reuse_addr()
-            self.logger.info("listening on %r", self.addr)
+            self.logger.info("listening on %r", addr)
             self.bind(addr)
             self.listen(255)
         except socket.error:
@@ -441,7 +441,7 @@ class udp_listener(BaseListener):
             self.create_socket(family, socket.SOCK_DGRAM)
             if not is_win32:
                 self.set_reuse_addr()
-            self.logger.info("listening on udp %r", self.addr)
+            self.logger.info("listening on udp %r", addr)
             self.bind(addr)
         except socket.error:
             self.close()

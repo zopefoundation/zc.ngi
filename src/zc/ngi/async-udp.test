@@ -8,6 +8,7 @@ async UDP support
     ...     addr = '127.0.0.1'
     ... else:
     ...     addr = ''
+    >>> addrText = repr((addr, 9644))
 
 
     >>> zc.ngi.async.udp((addr, 9644), 'test')
@@ -15,8 +16,20 @@ async UDP support
     >>> def handler(addr, message):
     ...     print message
 
+    >>> import zope.testing.loggingsupport, logging
+    >>> loghandler = zope.testing.loggingsupport.InstalledHandler(
+    ...                  None, level=logging.INFO)
+
     >>> listener = zc.ngi.async.udp_listener((addr, 9644), handler)
     >>> time.sleep(0.1)
+
+    >>> logcontent = str(loghandler)
+    >>> print logcontent # doctest: +ELLIPSIS
+    zc.ngi.async.udpserver INFO
+      listening on udp ('...', 9644)
+
+    >>> addrText in logcontent
+    True
 
     >>> zc.ngi.async.udp((addr, 9644), 'test'); time.sleep(0.1)
     test
