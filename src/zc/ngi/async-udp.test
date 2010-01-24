@@ -41,3 +41,5 @@ async UDP support
     >>> time.sleep(0.1)
 
     >>> zc.ngi.async.udp((addr, 9644), 'test'); time.sleep(0.1)
+
+    >>> loghandler.uninstall()

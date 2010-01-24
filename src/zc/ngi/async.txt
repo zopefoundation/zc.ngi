@@ -239,3 +239,4 @@ Trying to rebind to a port in use:
 
     >>> listener.close()
     >>> time.sleep(0.1)
+    >>> loghandler.uninstall()
