@@ -17,6 +17,15 @@ Changes
 *******
 
 ==================
+1.1.6 (unreleased)
+==================
+
+Bug fixed:
+
+- Fixed bad logging of ``listening on ...`` for ``listener``
+  and ``udp_listener``.
+
+==================
 1.1.5 (2010-01-19)
 ==================
 
