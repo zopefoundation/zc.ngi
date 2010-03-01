@@ -17,18 +17,14 @@ Changes
 *******
 
 ==================
-1.1.6 (unreleased)
+1.1.6 (2010-03-01)
 ==================
 
 Bug fixed:
 
-- Fixed bad logging of ``listening on ...`` for ``listener``
-  and ``udp_listener``.
-
 - Fixed bad logging of ``listening on ...``. The message was emitted
-  before the actual operation was successful.
-  Emits now a warning ``unable to listen on...`` if binding to the given
-  address fails.
+  before the actual operation was successful.  Emits now a warning
+  ``unable to listen on...`` if binding to the given address fails.
 
 ==================
 1.1.5 (2010-01-19)
