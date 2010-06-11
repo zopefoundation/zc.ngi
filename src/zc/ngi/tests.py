@@ -16,11 +16,15 @@
 $Id$
 """
 from zope.testing import doctest
+import logging
 import manuel.capture
 import manuel.doctest
 import manuel.testing
-import threading, unittest
+import sys
+import threading
+import unittest
 import zc.ngi.async
+import zc.ngi.generator
 import zc.ngi.testing
 import zc.ngi.wordcount
 
@@ -127,9 +131,60 @@ def failure_to_bind_removes_listener_from_socket_map():
     True
 
     >>> s.close()
+    """
+
+def async_error_in_client_when_conection_is_closed():
+    """
+If a connection is closed, we need to make sure write calls generate errors.
+
+    >>> logger = logging.getLogger('zc.ngi')
+    >>> log_handler = logging.StreamHandler(sys.stdout)
+    >>> logger.addHandler(log_handler)
+    >>> logger.setLevel(logging.WARNING)
+
+    >>> server_event = threading.Event()
+    >>> @zc.ngi.generator.handler
+    ... def server(conn):
+    ...     data = yield
+    ...     print data
+    ...     server_event.set()
+
+    >>> listener = zc.ngi.async.listener(None, server)
+
+    >>> class Connector:
+    ...     def __init__(self):
+    ...         self.event = threading.Event()
+    ...     def connected(self, conn):
+    ...         self.conn = conn
+    ...         self.event.set()
+
+    >>> connector = Connector()
+    >>> zc.ngi.async.connect(listener.address, connector)
+    >>> connector.event.wait(1)
+
+OK, we've connected.  If we close the connection, we won't be able to write:
+
+    >>> connector.conn.close()
+    >>> connector.conn.write('xxx')
+
+    >>> connector.conn.writelines(['xxx', 'yyy'])
+
+Similarly if the server closes the connection:
+
+    >>> connector = Connector()
+    >>> zc.ngi.async.connect(listener.address, connector)
+    >>> connector.event.wait(1)
+
+    >>> connector.conn.write('aaa'); server_event.wait(1)
+    aaa
+
+    >>> connector.conn.write('xxx')
+
+    >>> connector.conn.writelines(['xxx', 'yyy'])
 
 
-
+    >>> logger.removeHandler(log_handler)
+    >>> logger.setLevel(logging.NOTSET)
 
     """
 
