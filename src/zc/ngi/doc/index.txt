@@ -360,7 +360,7 @@ NGI doesn't keep the main thread running
 An important thing to note about NGI is that it doesn't provide
 support for maintaining the main application thread. The threads it
 creates for itself are "daemon" threads, meaning they don't keep an
-application running when the main thread exists.  If a main program
+application running when the main thread exits.  If a main program
 ended with an implantation's listener call. the program would likely
 exit before the listener had a chance to get and service any
 connections.
