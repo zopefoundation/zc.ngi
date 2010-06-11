@@ -29,9 +29,9 @@ class Base(object):
         self.write = self.connection.write
         self.write(data)
 
-    def writelined(self, data):
-        self.writelined = self.connection.writelined
-        self.writelined(data)
+    def writelines(self, data):
+        self.writelines = self.connection.writelines
+        self.writelines(data)
 
     def setHandler(self, handler):
         self.handler = handler
