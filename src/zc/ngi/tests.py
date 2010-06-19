@@ -11,10 +11,6 @@
 # FOR A PARTICULAR PURPOSE.
 #
 ##############################################################################
-"""XXX short summary goes here.
-
-$Id$
-"""
 from zope.testing import doctest
 import logging
 import manuel.capture
