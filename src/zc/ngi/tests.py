@@ -206,6 +206,110 @@ def when_a_server_closes_a_connection_blocking_request_returns_reason():
     >>> listener.close()
     """
 
+def errors_raised_by_handler_should_be_propigated_by_blocking_request():
+    """
+    Errors raised by handlers should propigate to the request caller,
+    rather than just getting logged as usual.
+
+    Note that this test also exercises error handling in zc.ngi.async.
+
+    >>> from zc.ngi import async
+    >>> from zc.ngi.adapters import Sized
+    >>> from zc.ngi.blocking import request
+
+    >>> @Sized.handler
+    ... def echo(c):
+    ...     while 1:
+    ...         data = (yield)
+    ...         if data == 'stop': break
+    ...         c.write(data)
+
+    >>> listener = async.listener(None, echo)
+
+    Handle error in setup
+
+    >>> @Sized.handler
+    ... def bad(c):
+    ...     raise ValueError
+
+    >>> try: request(async.connect, listener.address, bad, 1)
+    ... except ValueError: pass
+    ... else: print 'oops'
+
+    Handle error in input
+
+    >>> @Sized.handler
+    ... def bad(c):
+    ...     c.write('test')
+    ...     data = (yield)
+    ...     raise ValueError
+
+    >>> try: request(async.connect, listener.address, bad, 1)
+    ... except ValueError: pass
+    ... else: print 'oops'
+
+    Handle error in close
+
+    >>> @Sized.handler
+    ... def bad(c):
+    ...     c.write('stop')
+    ...     try:
+    ...         while 1:
+    ...             data = (yield)
+    ...     except GeneratorExit:
+    ...         raise ValueError
+
+    >>> try: request(async.connect, listener.address, bad, 1)
+    ... except ValueError: pass
+    ... else: print 'oops'
+
+    Handle error in handle_exception arising from error during iteration:
+
+    >>> @Sized.handler
+    ... def bad(c):
+    ...     c.writelines(XXX for i in range(2))
+    ...     data = (yield)
+
+    >>> try: request(async.connect, listener.address, bad, 1)
+    ... except NameError: pass
+    ... else: print 'oops'
+
+    >>> listener.close()
+    """
+
+def async_handling_iteration_errors():
+    """
+
+    >>> from zc.ngi import async
+    >>> from zc.ngi.adapters import Sized
+    >>> from zc.ngi.blocking import request
+
+    >>> @Sized.handler
+    ... def echo(c):
+    ...     while 1:
+    ...         data = (yield)
+    ...         if data == 'stop': break
+    ...         c.write(data)
+
+    >>> listener = async.listener(None, echo)
+
+    Handler with no handle_exception but with a handle close.
+
+    >>> event = threading.Event()
+    >>> class Bad:
+    ...    def connected(self, connection):
+    ...        connection.setHandler(self)
+    ...        connection.writelines(XXX for i in range(2))
+    ...    def handle_close(self, connection, reason):
+    ...        print 'closed', reason
+    ...        event.set()
+
+    >>> zc.ngi.async.connect(listener.address, Bad()); event.wait(1)
+    closed Bad instance has no attribute 'handle_exception'
+
+    >>> listener.close()
+    """
+
 class BrokenConnect:
 
     connected = failed_connect = __call__ = lambda: xxxxx

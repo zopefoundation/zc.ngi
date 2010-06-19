@@ -11,9 +11,9 @@
 # FOR A PARTICULAR PURPOSE.
 #
 ##############################################################################
-
-import threading, time
-
+import sys
+import threading
+import time
 import zc.ngi
 
 class ConnectionFailed(Exception):
@@ -52,12 +52,23 @@ class RequestConnection:
         self.connection.setHandler(self)
 
     def handle_input(self, connection, data):
-        self.handler.handle_input(self, data)
+        try:
+            self.handler.handle_input(self, data)
+        except:
+            self.connector.exception = sys.exc_info()
+            self.connector.event.set()
+            raise
 
     def handle_close(self, connection, reason):
         handle_close = getattr(self.handler, 'handle_close', None)
         if handle_close is not None:
-            handle_close(self, reason)
+            try:
+                handle_close(self, reason)
+            except:
+                self.connector.exception = sys.exc_info()
+                self.connector.event.set()
+                raise
+
         self.connector.closed = True
         self.connector.result = reason
         self.connector.event.set()
@@ -65,7 +76,15 @@ class RequestConnection:
     @property
     def handle_exception(self):
         handle = self.handler.handle_exception
-        return lambda c, exception: handle(self, exception)
+        def handle_exception(connection, exception):
+            try:
+                handle(self, exception)
+            except:
+                self.connector.exception = sys.exc_info()
+                self.connector.event.set()
+                raise
+        return handle_exception
+
 
 class RequestConnector:
 
@@ -87,7 +106,12 @@ class RequestConnector:
 
     def connected(self, connection):
         self.connection = connection
-        self._connected(RequestConnection(connection, self))
+        try:
+            self._connected(RequestConnection(connection, self))
+        except:
+            self.exception = sys.exc_info()
+            self.event.set()
+            raise
 
     def failed_connect(self, reason):
         self.exception = ConnectionFailed(reason)
@@ -98,10 +122,18 @@ def request(connect, address, connection_handler, timeout=None):
     connector = RequestConnector(connection_handler, event)
     connect(address, connector)
     event.wait(timeout)
+
+    if connector.exception:
+        exception = connector.exception
+        del connector.exception
+        if isinstance(exception, tuple):
+            raise exception[0], exception[1], exception[2]
+        else:
+            raise exception
+
     if connector.closed:
         return connector.result
-    if connector.exception:
-        raise connector.exception
+
     if connector.connection is None:
         raise ConnectionTimeout
     raise Timeout

@@ -78,7 +78,7 @@ class _Connection(dispatcher):
         self.__connected = True
         self.__closed = None
         self.__handler = None
-        self.__exception = None
+        self.__iterator_exception = None
         self.__output = []
         dispatcher.__init__(self, sock, addr)
         self.logger = logger
@@ -91,14 +91,14 @@ class _Connection(dispatcher):
             raise TypeError("Handler already set")
 
         self.__handler = handler
-        if self.__exception:
-            exception = self.__exception
-            self.__exception = None
+        if self.__iterator_exception:
+            v = self.__iterator_exception
+            self.__iterator_exception = None
             try:
-                handler.handle_exception(self, exception)
+                handler.handle_exception(self, v)
             except:
                 self.logger.exception("handle_exception failed")
-                return self.handle_close("handle_exception failed")
+                raise
 
         if self.__closed:
             try:
@@ -156,7 +156,7 @@ class _Connection(dispatcher):
                 self.__handler.handle_input(self, d)
             except:
                 self.logger.exception("handle_input failed")
-                self.handle_close("handle_input failed")
+                raise
 
             if len(d) < BUFFER_SIZE:
                 break
@@ -176,15 +176,21 @@ class _Connection(dispatcher):
                 # Must be an iterator
                 try:
                     v = v.next()
+                    if not isinstance(v, str):
+                        raise TypeError(
+                            "writelines iterator must return strings",
+                            v)
                 except StopIteration:
                     # all done
                     output.pop(0)
                     continue
-
-                if __debug__ and not isinstance(v, str):
-                    exc = TypeError("iterable output returned a non-string", v)
-                    self.__report_exception(exc)
-                    raise exc
+                except Exception, v:
+                    self.logger.exception("writelines iterator failed")
+                    if self.__handler is None:
+                        self.__iterator_exception = v
+                        raise
+                    else:
+                        self.__handler.handle_exception(self, v)
 
                 output.insert(0, v)
 
@@ -199,7 +205,7 @@ class _Connection(dispatcher):
                     return # we couldn't write anything
                 raise
             except Exception, v:
-                self.__report_exception(v)
+                self.logger.exception("send failed")
                 raise
 
             if n == len(v):
@@ -207,16 +213,6 @@ class _Connection(dispatcher):
             else:
                 output[0] = v[n:]
                 return # can't send any more
-
-    def __report_exception(self, exception):
-        if self.__handler is not None:
-            try:
-                self.__handler.handle_exception(self, exception)
-            except:
-                self.logger.exception("handle_exception failed")
-                self.handle_close("handle_exception failed")
-        else:
-            self.__exception = exception
 
     def handle_close(self, reason='end of input'):
         if __debug__:
