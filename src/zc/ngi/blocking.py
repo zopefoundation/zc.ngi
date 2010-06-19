@@ -11,10 +11,6 @@
 # FOR A PARTICULAR PURPOSE.
 #
 ##############################################################################
-"""File-like network interface
-
-$Id$
-"""
 
 import threading, time
 
@@ -47,8 +43,8 @@ class RequestConnection:
         self.writelines(data)
 
     def close(self):
+        self.connector.closed = True
         self.connection.close()
-        self.connector.closed = 'client'
         self.connector.event.set()
 
     def setHandler(self, handler):
@@ -62,7 +58,8 @@ class RequestConnection:
         handle_close = getattr(self.handler, 'handle_close', None)
         if handle_close is not None:
             handle_close(self, reason)
-        self.connector.closed = reason
+        self.connector.closed = True
+        self.connector.result = reason
         self.connector.event.set()
 
     @property
@@ -72,7 +69,7 @@ class RequestConnection:
 
 class RequestConnector:
 
-    exception = closed = connection = None
+    exception = closed = connection = result = None
 
     def __init__(self, handler, event):
         try:
@@ -101,8 +98,8 @@ def request(connect, address, connection_handler, timeout=None):
     connector = RequestConnector(connection_handler, event)
     connect(address, connector)
     event.wait(timeout)
-    if connector.closed is not None:
-        return connector.closed
+    if connector.closed:
+        return connector.result
     if connector.exception:
         raise connector.exception
     if connector.connection is None:

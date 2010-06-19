@@ -188,6 +188,28 @@ Similarly if the server closes the connection:
 
     """
 
+def when_a_server_closes_a_connection_blocking_request_returns_reason():
+    """
+
+    >>> import zc.ngi.adapters, zc.ngi.async, zc.ngi.blocking
+    >>> @zc.ngi.adapters.Sized.handler
+    ... def echo1(c):
+    ...     c.write((yield))
+
+    >>> listener = zc.ngi.async.listener(None, echo1)
+    >>> @zc.ngi.adapters.Sized.handler
+    ... def client(c):
+    ...     c.write('test')
+    ...     print '1', (yield)
+    ...     print '2', (yield)
+    >>> zc.ngi.blocking.request(zc.ngi.async.connect, listener.address,
+    ...                         client, 1)
+    ... # doctest: +ELLIPSIS
+    1...
+    'end of input'
+    >>> listener.close()
+    """
+
 class BrokenConnect:
 
     connected = failed_connect = __call__ = lambda: xxxxx

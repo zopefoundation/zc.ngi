@@ -12,10 +12,9 @@
 #
 ##############################################################################
 """NGI connection adapters
-
-$Id$
 """
 import struct
+import zc.ngi.generator
 
 class Base(object):
 
@@ -46,6 +45,10 @@ class Base(object):
 
     def handle_exception(self, connection, reason):
         self.handler.handle_exception(connection, reason)
+
+    @classmethod
+    def handler(class_, func):
+        return zc.ngi.generator.handler(func, class_)
 
 class Lines(Base):
 
