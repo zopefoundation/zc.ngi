@@ -12,23 +12,47 @@
 #
 ##############################################################################
 """NGI connection adapters
-
-$Id$
 """
 import struct
+import zc.ngi.generator
 
-class Lines:
+class Base(object):
 
     def __init__(self, connection):
         self.connection = connection
-        self.close = connection.close
-        self.write = connection.write
-        self.writelines = connection.writelines
+
+    def close(self):
+        self.connection.close()
+
+    def write(self, data):
+        self.write = self.connection.write
+        self.write(data)
+
+    def writelines(self, data):
+        self.writelines = self.connection.writelines
+        self.writelines(data)
 
     def setHandler(self, handler):
         self.handler = handler
-        self.input = ''
         self.connection.setHandler(self)
+
+    def handle_input(self, connection, data):
+        handle_input = self.handler.handle_input
+        self.handle_input(connection, data)
+
+    def handle_close(self, connection, reason):
+        self.handler.handle_close(connection, reason)
+
+    def handle_exception(self, connection, reason):
+        self.handler.handle_exception(connection, reason)
+
+    @classmethod
+    def handler(class_, func):
+        return zc.ngi.generator.handler(func, class_)
+
+class Lines(Base):
+
+    input = ''
 
     def handle_input(self, connection, data):
         self.input += data
@@ -37,23 +61,15 @@ class Lines:
         for line in data:
             self.handler.handle_input(self, line)
 
-    def handle_close(self, connection, reason):
-        self.handler.handle_close(self, reason)
 
+class Sized(Base):
 
-class Sized:
-
-    def __init__(self, connection):
-        self.connection = connection
-        self.close = connection.close
-
+    want = 4
+    got = 0
+    getting_size = True
     def setHandler(self, handler):
-        self.handler = handler
         self.input = []
-        self.want = 4
-        self.got = 0
-        self.getting_size = True
-        self.connection.setHandler(self)
+        Base.setHandler(self, handler)
 
     def handle_input(self, connection, data):
         self.got += len(data)
@@ -84,11 +100,20 @@ class Sized:
                 self.getting_size = True
                 self.handler.handle_input(self, collected)
 
-    def handle_close(self, connection, reason):
-        self.handler.handle_close(self, reason)
+    def writelines(self, data):
+        self.connection.writelines(sized_iter(data))
 
     def write(self, message):
         if message is None:
             self.connection.write('\xff\xff\xff\xff')
         else:
-            self.connection.write(struct.pack(">I", len(message))+message)
+            self.connection.write(struct.pack(">I", len(message)))
+            self.connection.write(message)
+
+def sized_iter(data):
+    for message in data:
+        if message is None:
+            yield '\xff\xff\xff\xff'
+        else:
+            yield struct.pack(">I", len(message))
+            yield message

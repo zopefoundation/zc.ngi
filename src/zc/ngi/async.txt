@@ -94,7 +94,7 @@ we'll use the blocking interface:
     >>> input.readline()
     Traceback (most recent call last):
     ...
-    TypeError: ('iterable output returned a non-string', 2)
+    TypeError: ('writelines iterator must return strings', 2)
 
   If there is an error, then the connection is closed:
 
@@ -164,9 +164,11 @@ we'll use the blocking interface:
     >>> print loghandler
     zc.ngi.async.client ERROR
       handle_input failed
+    zc.ngi.async.client ERROR
+      handle_error
 
     >>> handler.closed
-    'handle_input failed'
+    TypeError('handle_input() takes exactly 2 arguments (3 given)',)
 
     >>> loghandler.uninstall()
 
@@ -225,9 +227,11 @@ Trying to rebind to a port in use:
     >>> time.sleep(0.1)
 
     >>> listener2 = zc.ngi.async.listener(('127.0.0.1', 9645), handler)
+    ... # doctest: +ELLIPSIS
     Traceback (most recent call last):
     ...
-    error: (98, 'Address already in use')
+    error:...Address already in use...
+
     >>> time.sleep(0.1)
 
     >>> logcontent = str(loghandler)

@@ -14,49 +14,27 @@
 
 name, version = 'zc.ngi', '0'
 
-import os
 from setuptools import setup, find_packages
 
-def read(*rnames):
-    return open(os.path.join(os.path.dirname(__file__), *rnames)).read()
+readme = open('README.txt').read()
 
-long_description=(
-        read('README.txt')
-        + '\n' +
-        'Detailed Documentation\n'
-        '**********************\n'
-        + '\n' +
-        read('src', 'zc', 'ngi', 'README.txt')
-        + '\n' +
-        read('src', 'zc', 'ngi', 'blocking.txt')
-        + '\n' +
-        read('src', 'zc', 'ngi', 'adapters.txt')
-        + '\n' +
-        read('src', 'zc', 'ngi', 'async.txt')
-        + '\n' +
-        'Download\n'
-        '**********************\n'
-        )
-
-open('documentation.txt', 'w').write(long_description)
+tests_require = ['zope.testing', 'manuel']
 
 setup(
     name = name, version=version,
     author = "Jim Fulton",
     author_email = "jim@zope.com",
-    description = "Network Gateway Interface",
+    description = readme.split('\n', 1)[0],
     license = "ZPL 2.1",
-    keywords = "network",
-    url='http://www.python.org/pypi/'+name,
-    long_description=long_description,
+    keywords = ["networking", "testing"],
+    url='http://packages.python.org/'+name,
+    long_description=readme,
 
     packages = find_packages('src'),
     include_package_data = True,
     package_dir = {'':'src'},
     namespace_packages = ['zc'],
     install_requires = ['setuptools'],
-    extras_require = dict(
-        test = ['zope.testing'],
-        ),
+    extras_require = dict(test=tests_require),
     zip_safe = False,
     )

@@ -3,7 +3,7 @@ Blocking network access
 =======================
 
 The NGI normally uses an event-based networking model in which
-application code reactes to incoming data.  That model works well for
+application code reacts to incoming data.  That model works well for
 some applications, especially server applications, but can be a bit of
 a bother for simpler applications, especially client applications.
 

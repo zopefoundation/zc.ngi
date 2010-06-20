@@ -1,17 +1,20 @@
-*************************
 Network Gateway Interface
 *************************
 
-Network programs are typically difficult to test because they require
-setting up network connections, clients, and servers.  In addition,
-application code gets mixed up with networking code.
+The Network Gateway Interface provides:
 
-The Network Gateway Interface (NGI) seeks to improve this situation by
-separating application code from network code.  This allows
-application and network code to be tested independently and provides
-greater separation of concerns.
+- the ability to test application networking code without use of
+  sockets, threads or subprocesses
 
-.. contents::
+- clean separation of application code and low-level networking code
+
+- a fairly simple inheritence free set of networking APIs
+
+- an event-based framework that makes it easy to handle many
+  simultaneous connections while still supporting an imperative
+  programming style.
+
+To learn more, see http://packages.python.org/zc.ngi/
 
 Changes
 *******

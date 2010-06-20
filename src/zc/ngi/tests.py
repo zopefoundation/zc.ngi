@@ -11,15 +11,20 @@
 # FOR A PARTICULAR PURPOSE.
 #
 ##############################################################################
-"""XXX short summary goes here.
-
-$Id$
-"""
-import threading, unittest
-from zope.testing import doctest
-import zc.ngi.testing
+import doctest
+import logging
+import manuel.capture
+import manuel.doctest
+import manuel.testing
+import sys
+import threading
+import unittest
 import zc.ngi.async
+import zc.ngi.generator
+import zc.ngi.testing
 import zc.ngi.wordcount
+
+zc.ngi.async.start_thread() # Make sure the thread is already running
 
 def test_async_cannot_connect():
     """Let's make sure that the connector handles connection failures correctly
@@ -122,10 +127,187 @@ def failure_to_bind_removes_listener_from_socket_map():
     True
 
     >>> s.close()
+    """
+
+def async_error_in_client_when_conection_is_closed():
+    """
+If a connection is closed, we need to make sure write calls generate errors.
+
+    >>> logger = logging.getLogger('zc.ngi')
+    >>> log_handler = logging.StreamHandler(sys.stdout)
+    >>> logger.addHandler(log_handler)
+    >>> logger.setLevel(logging.WARNING)
+
+    >>> server_event = threading.Event()
+    >>> @zc.ngi.generator.handler
+    ... def server(conn):
+    ...     data = yield
+    ...     print data
+    ...     server_event.set()
+
+    >>> listener = zc.ngi.async.listener(None, server)
+
+    >>> class Connector:
+    ...     def __init__(self):
+    ...         self.event = threading.Event()
+    ...     def connected(self, conn):
+    ...         self.conn = conn
+    ...         self.event.set()
+
+    >>> connector = Connector()
+    >>> zc.ngi.async.connect(listener.address, connector)
+    >>> connector.event.wait(1)
+
+OK, we've connected.  If we close the connection, we won't be able to write:
+
+    >>> connector.conn.close()
+    >>> connector.conn.write('xxx')
+
+    >>> connector.conn.writelines(['xxx', 'yyy'])
+
+Similarly if the server closes the connection:
+
+    >>> connector = Connector()
+    >>> zc.ngi.async.connect(listener.address, connector)
+    >>> connector.event.wait(1)
+
+    >>> connector.conn.write('aaa'); server_event.wait(1)
+    aaa
+
+    >>> connector.conn.write('xxx')
+
+    >>> connector.conn.writelines(['xxx', 'yyy'])
 
 
+    >>> logger.removeHandler(log_handler)
+    >>> logger.setLevel(logging.NOTSET)
 
+    """
 
+def when_a_server_closes_a_connection_blocking_request_returns_reason():
+    """
+
+    >>> import zc.ngi.adapters, zc.ngi.async, zc.ngi.blocking
+    >>> @zc.ngi.adapters.Sized.handler
+    ... def echo1(c):
+    ...     c.write((yield))
+
+    >>> listener = zc.ngi.async.listener(None, echo1)
+    >>> @zc.ngi.adapters.Sized.handler
+    ... def client(c):
+    ...     c.write('test')
+    ...     print '1', (yield)
+    ...     print '2', (yield)
+    >>> zc.ngi.blocking.request(zc.ngi.async.connect, listener.address,
+    ...                         client, 1)
+    ... # doctest: +ELLIPSIS
+    1...
+    'end of input'
+    >>> listener.close()
+    """
+
+def errors_raised_by_handler_should_be_propigated_by_blocking_request():
+    """
+    Errors raised by handlers should propigate to the request caller,
+    rather than just getting logged as usual.
+
+    Note that this test also exercises error handling in zc.ngi.async.
+
+    >>> from zc.ngi import async
+    >>> from zc.ngi.adapters import Sized
+    >>> from zc.ngi.blocking import request
+
+    >>> @Sized.handler
+    ... def echo(c):
+    ...     while 1:
+    ...         data = (yield)
+    ...         if data == 'stop': break
+    ...         c.write(data)
+
+    >>> listener = async.listener(None, echo)
+
+    Handle error in setup
+
+    >>> @Sized.handler
+    ... def bad(c):
+    ...     raise ValueError
+
+    >>> try: request(async.connect, listener.address, bad, 1)
+    ... except ValueError: pass
+    ... else: print 'oops'
+
+    Handle error in input
+
+    >>> @Sized.handler
+    ... def bad(c):
+    ...     c.write('test')
+    ...     data = (yield)
+    ...     raise ValueError
+
+    >>> try: request(async.connect, listener.address, bad, 1)
+    ... except ValueError: pass
+    ... else: print 'oops'
+
+    Handle error in close
+
+    >>> @Sized.handler
+    ... def bad(c):
+    ...     c.write('stop')
+    ...     try:
+    ...         while 1:
+    ...             data = (yield)
+    ...     except GeneratorExit:
+    ...         raise ValueError
+
+    >>> try: request(async.connect, listener.address, bad, 1)
+    ... except ValueError: pass
+    ... else: print 'oops'
+
+    Handle error in handle_exception arising from error during iteration:
+
+    >>> @Sized.handler
+    ... def bad(c):
+    ...     c.writelines(XXX for i in range(2))
+    ...     data = (yield)
+
+    >>> try: request(async.connect, listener.address, bad, 1)
+    ... except NameError: pass
+    ... else: print 'oops'
+
+    >>> listener.close()
+    """
+
+def async_handling_iteration_errors():
+    """
+
+    >>> from zc.ngi import async
+    >>> from zc.ngi.adapters import Sized
+    >>> from zc.ngi.blocking import request
+
+    >>> @Sized.handler
+    ... def echo(c):
+    ...     while 1:
+    ...         data = (yield)
+    ...         if data == 'stop': break
+    ...         c.write(data)
+
+    >>> listener = async.listener(None, echo)
+
+    Handler with no handle_exception but with a handle close.
+
+    >>> event = threading.Event()
+    >>> class Bad:
+    ...    def connected(self, connection):
+    ...        connection.setHandler(self)
+    ...        connection.writelines(XXX for i in range(2))
+    ...    def handle_close(self, connection, reason):
+    ...        print 'closed', reason
+    ...        event.set()
+
+    >>> zc.ngi.async.connect(listener.address, Bad()); event.wait(1)
+    closed Bad instance has no attribute 'handle_exception'
+
+    >>> listener.close()
     """
 
 class BrokenConnect:
@@ -181,6 +363,10 @@ def async_evil_setup(test):
 
 def test_suite():
     return unittest.TestSuite([
+        manuel.testing.TestSuite(
+            manuel.capture.Manuel() + manuel.doctest.Manuel(),
+            'doc/index.txt',
+            ),
         doctest.DocFileSuite(
             'README.txt',
             'testing.test',

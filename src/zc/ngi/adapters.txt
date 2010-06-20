@@ -53,10 +53,19 @@ as would the underlying connection:
     >>> adapter.write('foo')
     -> 'foo'
 
-    >>> adapter.writelines(['foo', 'bar'])
-    -> 'foo'
-    -> 'bar'
+    >>> adapter.writelines("%s\n" % foo for foo in range(3))
+    -> '0\n'
+    -> '1\n'
+    -> '2\n'
 
+.. again with feeling
+
+    >>> adapter.writelines("%s\n" % foo for foo in range(3))
+    -> '0\n'
+    -> '1\n'
+    -> '2\n'
+
+::
     >>> connection.test_close('test')
     -> CLOSE test
 
@@ -98,7 +107,19 @@ If we write a message, we can see that the message is preceded by the
 message size:
 
     >>> adapter.write(message1)
-    -> '\x00\x00\x00\x19Hello\nWorld!\nHow are you?'
+    -> '\x00\x00\x00\x19'
+    -> 'Hello\nWorld!\nHow are you?'
+
+We can give multiple messages using writelines:
+
+    >>> adapter.writelines("%s\n" % foo for foo in range(3))
+    -> '\x00\x00\x00\x02'
+    -> '0\n'
+    -> '\x00\x00\x00\x02'
+    -> '1\n'
+    -> '\x00\x00\x00\x02'
+    -> '2\n'
+
 
 Null messages
 -------------

@@ -1,0 +1,151 @@
+Reference
+=========
+
+.. automodule:: zc.ngi.interfaces
+
+NGI Application Interfaces
+--------------------------
+
+The application interfaces are implemented by application developers
+to provide application-specific logic. The core application interface
+is ``IConnectionHandler``:
+
+.. autoclass:: IConnectionHandler
+   :members:
+
+.. autoclass:: IClientConnectHandler
+   :members:
+
+.. autoclass:: IServer
+   :members:
+
+.. autoclass:: IUDPHandler
+   :members:
+
+NGI Implementation Interfaces
+-----------------------------
+
+Implementation interfaces are provided by an implementation and used
+by applications.
+
+.. autoclass:: IConnection
+   :members:
+
+.. autoclass:: IImplementation
+   :members:
+
+.. autoclass:: IListener
+   :members:
+
+   .. attribute:: address
+
+      The address the listener is listening for connections on.
+
+.. autoclass:: IServerConnection
+   :members:
+
+   .. attribute:: control
+
+      The listener (:class:`IListener`) that recieved and controls the
+      connection.
+
+.. autoclass:: IUDPListener
+   :members:
+
+NGI Implementations
+-------------------
+
+This section provides additional information about the included NGI
+implementations. For the most part, any implementation is specified by
+:class:`IImplementation`, however, there are a few details of interest
+for the implementations.
+
+zc.ngi.testing
+~~~~~~~~~~~~~~
+
+.. module:: zc.ngi.testing
+
+As its name implies, the testing implementation supports testing
+application code. It allows testing networking applications without
+actually creating any sockets and without having to resort to threads
+or subprocesses.
+
+Like any NGI implementation, the testing implementation is defined by
+:class:`IImplementation`.  This section expands on the documentation
+provided by :class:`IImplementation`.
+
+.. note::
+
+   The testing implementation provides a number of functions and
+   methods not documented here or in the NGI interfaces that were
+   documented in earlier versions of NGI.  These should now be viewed
+   as deprecated or internal to the testing implementation.
+
+
+Addresses are only barely used by the testing implementation.  Any
+hashable object may be used as an address.
+
+.. class:: Connection
+
+   The ``Connection`` class provides an implementation of
+   :class:`IConnection <zc.ngi.interfaces.IConnection>`.  Connections
+   may be created automatically by the implementation and passed to
+   :class:`servers <zc.ngi.interfaces.IServer>` or :class:`client
+   connect handlers <zc.ngi.interfaces.IClientConnectHandler`, but for
+   testing, you'll often want to create your own connections so you
+   can pass them to handlers yourself.  Connections are created by
+   calling them without arguments::
+
+      connection = zc.ngi.testing.Connection()
+
+   My default, test connections have handlers that write data to
+   standard output.  You can change their handlers using setHandler.
+
+   .. attribute:: peer
+
+      Test connections are used in pairs to simulate both ends of TCP
+      connections.  Connections have a peer attribute which represents
+      the other end of a connection.  A connection is its peer's
+      peer. When you pass data to a connection's
+      :meth:`write <zc.ngi.interfaces.IConnection.write>` or
+      :meth:`writelines <zc.ngi.interfaces.IConnection.writelines>`
+      methods, the data will ultimately be passed to the
+      :meth:`handle_input <zc.ngi.interfaces.IConnectionHandler.handle_input>`
+      method of the connection's peer.
+
+zc.ngi.async
+~~~~~~~~~~~~
+
+.. module:: zc.ngi.async
+
+The async impementation provides a real networking implementation
+using the ``asyncore`` module from the Python standard library.  All
+you really need to know about it is described by the
+:class:`IImplementation <zc.ngi.interfaces.IImplementation>`
+interface. This section provides a few additional details of interest.
+
+Addresses are generally 2-tuples having a host address and an integer
+port.  On Unix-like systems, they may also be strings giving names of
+unix domain sockets.
+
+The :meth:`listener <zc.ngi.interfaces.IImplementation.listener>`
+method also allows ``None`` to be passed as an address.  If ``None``
+is passed, a unused port on localhost will be randomly selected.  The
+resulting address can be obtained using the :attr:`address
+<zc.ngi.interfaces.IListener.address>` attribute. This is mainly
+useful for testing,
+
+The async implementation manages thread for performing network IO.
+This thread is started implicitly when an :class:`implementation
+<zc.ngi.interfaces.IImplementation>` method is called.  It may be
+started explicitly using the :func:`start_thread` function.
+
+.. function:: start_thread(daemon=True)
+
+   If the async thread hasn't started yet, then start the thread using
+   the given daemon mode.
+
+   For long-running applications, such as servers, using a
+   non-daemonic thread will keep the process going even after the main
+   thread completes, freeing the application programmer from needing
+   to maintain the main thread.

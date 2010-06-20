@@ -20,11 +20,9 @@ import asyncore
 import errno
 import logging
 import os
-import select
 import socket
 import sys
 import threading
-import time
 
 import zc.ngi
 
@@ -81,7 +79,7 @@ class _Connection(dispatcher):
         self.__connected = True
         self.__closed = None
         self.__handler = None
-        self.__exception = None
+        self.__iterator_exception = None
         self.__output = []
         dispatcher.__init__(self, sock, addr)
         self.logger = logger
@@ -94,14 +92,14 @@ class _Connection(dispatcher):
             raise TypeError("Handler already set")
 
         self.__handler = handler
-        if self.__exception:
-            exception = self.__exception
-            self.__exception = None
+        if self.__iterator_exception:
+            v = self.__iterator_exception
+            self.__iterator_exception = None
             try:
-                handler.handle_exception(self, exception)
+                handler.handle_exception(self, v)
             except:
                 self.logger.exception("handle_exception failed")
-                return self.handle_close("handle_exception failed")
+                raise
 
         if self.__closed:
             try:
@@ -159,7 +157,7 @@ class _Connection(dispatcher):
                 self.__handler.handle_input(self, d)
             except:
                 self.logger.exception("handle_input failed")
-                self.handle_close("handle_input failed")
+                raise
 
             if len(d) < BUFFER_SIZE:
                 break
@@ -179,15 +177,21 @@ class _Connection(dispatcher):
                 # Must be an iterator
                 try:
                     v = v.next()
+                    if not isinstance(v, str):
+                        raise TypeError(
+                            "writelines iterator must return strings",
+                            v)
                 except StopIteration:
                     # all done
                     output.pop(0)
                     continue
-
-                if __debug__ and not isinstance(v, str):
-                    exc = TypeError("iterable output returned a non-string", v)
-                    self.__report_exception(exc)
-                    raise exc
+                except Exception, v:
+                    self.logger.exception("writelines iterator failed")
+                    if self.__handler is None:
+                        self.__iterator_exception = v
+                        raise
+                    else:
+                        self.__handler.handle_exception(self, v)
 
                 output.insert(0, v)
 
@@ -202,7 +206,7 @@ class _Connection(dispatcher):
                     return # we couldn't write anything
                 raise
             except Exception, v:
-                self.__report_exception(v)
+                self.logger.exception("send failed")
                 raise
 
             if n == len(v):
@@ -210,16 +214,6 @@ class _Connection(dispatcher):
             else:
                 output[0] = v[n:]
                 return # can't send any more
-
-    def __report_exception(self, exception):
-        if self.__handler is not None:
-            try:
-                self.__handler.handle_exception(self, exception)
-            except:
-                self.logger.exception("handle_exception failed")
-                self.handle_close("handle_exception failed")
-        else:
-            self.__exception = exception
 
     def handle_close(self, reason='end of input'):
         if __debug__:
@@ -259,6 +253,8 @@ class connector(dispatcher):
         _CONNECT_OK          = (0, errno.EISCONN)
 
     def __init__(self, addr, handler):
+        if not _thread:
+            start_thread()
         self.__handler = handler
         if isinstance(addr, str):
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -356,6 +352,8 @@ class listener(BaseListener):
     logger = logging.getLogger('zc.ngi.async.server')
 
     def __init__(self, addr, handler):
+        if not _thread:
+            start_thread()
         self.__handler = handler
         self.__close_handler = None
         self.__connections = {}
@@ -368,7 +366,25 @@ class listener(BaseListener):
         try:
             if not is_win32:
                 self.set_reuse_addr()
-            self.bind(addr)
+            if addr is None:
+                # Try to pick one, primarily for testing
+                import random
+                n = 0
+                while 1:
+                    port = random.randint(10000, 30000)
+                    addr = 'localhost', port
+                    try:
+                        self.bind(addr)
+                    except socket.error:
+                        n += 1
+                        if n > 100:
+                            raise
+                        else:
+                            continue
+                    break
+            else:
+                self.bind(addr)
+
             self.logger.info("listening on %r", addr)
             self.listen(255)
         except socket.error:
@@ -376,6 +392,7 @@ class listener(BaseListener):
             self.logger.warn("unable to listen on %r", addr)
             raise
         self.add_channel(_map)
+        self.address = addr
         notify_select()
 
     def handle_accept(self):
@@ -416,7 +433,7 @@ class listener(BaseListener):
     def close(self, handler=None):
         self.accepting = False
         self.del_channel(_map)
-        self.socket.close()
+        call_from_thread(self.socket.close)
         if handler is None:
             for c in list(self.__connections):
                 c.handle_close("stopped")
@@ -425,12 +442,18 @@ class listener(BaseListener):
         else:
             self.__close_handler = handler
 
+    # convenience method made possible by storaing out address:
+    def connect(self, handler):
+        connect(self.address, handler)
+
 class udp_listener(BaseListener):
 
     logger = logging.getLogger('zc.ngi.async.udpserver')
     connected = True
 
     def __init__(self, addr, handler, buffer_size=4096):
+        if not _thread:
+            start_thread()
         self.__handler = handler
         self.__buffer_size = buffer_size
         asyncore.dispatcher.__init__(self)
@@ -457,7 +480,7 @@ class udp_listener(BaseListener):
 
     def close(self):
         self.del_channel(_map)
-        self.socket.close()
+        call_from_thread(self.socket.close)
 
 # udp uses GIL to get thread-safe socket management
 if is_win32:
@@ -484,6 +507,9 @@ class _Triggerbase(object):
 
     logger = logging.getLogger('zc.ngi.async.trigger')
 
+    def __init__(self):
+        self.callbacks = []
+
     def writable(self):
         return 0
 
@@ -495,15 +521,23 @@ class _Triggerbase(object):
         self.close()
 
     def handle_read(self):
+        while self.callbacks:
+            callback = self.callbacks.pop(0)
+            try:
+                callback()
+            except:
+                self.logger.exception('Calling callback')
+
         try:
             self.recv(BUFFER_SIZE)
         except socket.error:
-            return
+            pass
 
 if os.name == 'posix':
 
     class _Trigger(_Triggerbase, asyncore.file_dispatcher):
         def __init__(self):
+            _Triggerbase.__init__(self)
             self.__readfd, self.__writefd = os.pipe()
             asyncore.file_dispatcher.__init__(self, self.__readfd)
 
@@ -528,6 +562,7 @@ else:
 
     class _Trigger(_Triggerbase, asyncore.dispatcher):
         def __init__(self):
+            _Triggerbase.__init__(self)
 
             # Get a pair of connected sockets.  The trigger is the 'w'
             # end of the pair, which is connected to 'r'.  'r' is put
@@ -596,6 +631,10 @@ _trigger = _Trigger()
 
 notify_select = _trigger.pull_trigger
 
+def call_from_thread(func):
+    _trigger.callbacks.append(func)
+    notify_select()
+
 def loop():
     timeout = 30.0
     map = _map
@@ -611,9 +650,20 @@ def loop():
         try:
             asyncore.poll(timeout, map)
         except:
+            print sys.exc_info()[0]
             logger.exception('loop error')
             raise
 
-_thread = threading.Thread(target=loop, name=__name__)
-_thread.setDaemon(True)
-_thread.start()
+_thread = None
+_start_lock = threading.Lock()
+def start_thread(daemon=True):
+    global _thread
+    _start_lock.acquire()
+    try:
+        if _thread is not None:
+            return
+        _thread = threading.Thread(target=loop, name=__name__)
+        _thread.setDaemon(daemon)
+        _thread.start()
+    finally:
+        _start_lock.release()

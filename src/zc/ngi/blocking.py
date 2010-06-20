@@ -11,13 +11,9 @@
 # FOR A PARTICULAR PURPOSE.
 #
 ##############################################################################
-"""File-like network interface
-
-$Id$
-"""
-
-import threading, time
-
+import sys
+import threading
+import time
 import zc.ngi
 
 class ConnectionFailed(Exception):
@@ -32,7 +28,119 @@ class ConnectionTimeout(Timeout, ConnectionFailed):
     """An attempt to connect timed out.
     """
 
-def connect(address, connect, timeout=None):
+class RequestConnection:
+
+    def __init__(self, connection, connector):
+        self.connection = connection
+        self.connector = connector
+
+    def write(self, data):
+        self.write = self.connection.write
+        self.write(data)
+
+    def writelines(self, data):
+        self.writelines = self.connection.writelines
+        self.writelines(data)
+
+    def close(self):
+        self.connector.closed = True
+        self.connection.close()
+        self.connector.event.set()
+
+    def setHandler(self, handler):
+        self.handler = handler
+        self.connection.setHandler(self)
+
+    def handle_input(self, connection, data):
+        try:
+            self.handler.handle_input(self, data)
+        except:
+            self.connector.exception = sys.exc_info()
+            self.connector.event.set()
+            raise
+
+    def handle_close(self, connection, reason):
+        handle_close = getattr(self.handler, 'handle_close', None)
+        if handle_close is not None:
+            try:
+                handle_close(self, reason)
+            except:
+                self.connector.exception = sys.exc_info()
+                self.connector.event.set()
+                raise
+
+        self.connector.closed = True
+        self.connector.result = reason
+        self.connector.event.set()
+
+    @property
+    def handle_exception(self):
+        handle = self.handler.handle_exception
+        def handle_exception(connection, exception):
+            try:
+                handle(self, exception)
+            except:
+                self.connector.exception = sys.exc_info()
+                self.connector.event.set()
+                raise
+        return handle_exception
+
+
+class RequestConnector:
+
+    exception = closed = connection = result = None
+
+    def __init__(self, handler, event):
+        try:
+            connected = handler.connected
+        except AttributeError:
+            if callable(handler):
+                connected = handler
+            elif getattr(handler, 'handle_input', None) is None:
+                raise
+            else:
+                connected = lambda connection: connection.setHandler(handler)
+
+        self._connected = connected
+        self.event = event
+
+    def connected(self, connection):
+        self.connection = connection
+        try:
+            self._connected(RequestConnection(connection, self))
+        except:
+            self.exception = sys.exc_info()
+            self.event.set()
+            raise
+
+    def failed_connect(self, reason):
+        self.exception = ConnectionFailed(reason)
+        self.event.set()
+
+def request(connect, address, connection_handler, timeout=None):
+    event = threading.Event()
+    connector = RequestConnector(connection_handler, event)
+    connect(address, connector)
+    event.wait(timeout)
+
+    if connector.exception:
+        exception = connector.exception
+        del connector.exception
+        if isinstance(exception, tuple):
+            raise exception[0], exception[1], exception[2]
+        else:
+            raise exception
+
+    if connector.closed:
+        return connector.result
+
+    if connector.connection is None:
+        raise ConnectionTimeout
+    raise Timeout
+
+def connect(address, connect=None, timeout=None):
+    if connect is None:
+        connect = zc.ngi.implementation.connect
     return _connector().connect(address, connect, timeout)
 
 class _connector:
@@ -58,7 +166,8 @@ class _connector:
         self.event.set()
 
 def open(connection_or_address, connector=None, timeout=None):
-    if connector is None:
+    if connector is None and hasattr(connection_or_address, 'setHandler'):
+        # connection_or_address is a connection
         connection = connection_or_address
     else:
         connection = connect(connection_or_address, connector, timeout)
