@@ -20,6 +20,32 @@ Changes
 *******
 
 ==================
+1.2.0 (2010-06-??)
+==================
+
+New Features:
+
+- New improved documentation
+
+- Support for writing request handlers in an imperative style using
+  generators.
+
+- Cleaner testing interfaces
+
+- Added a new blocking client request interface,
+  ``zc.ngi.blocking.request``.  Other older blocking APIs are
+  deprecated.
+
+- Dropped support for Python 2.4.
+
+Bugs Fixed:
+
+- The ``Sized`` request adapter's ``writelines`` method was broken.
+
+- There we a number of problems with error handling in the ``async``
+  implementation.
+
+==================
 1.1.6 (2010-03-01)
 ==================
 
