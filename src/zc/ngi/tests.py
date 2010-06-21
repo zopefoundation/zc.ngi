@@ -331,6 +331,9 @@ def async_evil_setup(test):
     #import logging
     #logging.getLogger().addHandler(logging.StreamHandler())
 
+    # clean up the map.
+    zc.ngi.async.cleanup_map()
+
     # See if we can break the main loop before running the async test
 
     # Connect to bad port with bad handler

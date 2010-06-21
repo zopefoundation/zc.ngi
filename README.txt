@@ -36,6 +36,11 @@ New Features:
   ``zc.ngi.blocking.request``.  Other older blocking APIs are
   deprecated.
 
+- Added support for running multiple ``async`` implementations in
+  separate threads. This is useful in applications with fewer network
+  connections and with handlers that tend to perform long-lating
+  computations that would be unacceptable with a single select loop.
+
 - Dropped support for Python 2.4.
 
 Bugs Fixed:
