@@ -35,7 +35,7 @@ IUDPHandler
     Application callback to handle incoming UDP messages.
 
 The interfaces are split between "implementation" and "application"
-interfaces.  An implementation of the NGI provides Implementation,
+interfaces.  An implementation of the NGI provides IImplementation,
 IConnection, IListener, and IUDPListener. An application provides
 IConnectionHandler and one or more of IClientConnectHandler,
 IServer, or IUDPHandler.
