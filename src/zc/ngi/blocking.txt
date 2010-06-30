@@ -47,8 +47,8 @@ We can use the writelines method to send data using an iterator:
     >>> output.writelines(hello("everyone"))
     >>> output.writelines(hello("bob"))
 
- To close the connection to the server, we'll send a close command,
- which is a documenty consisting of the letter "C":
+To close the connection to the server, we'll send a close command,
+which is a documenty consisting of the letter "C":
 
     >>> output.write("C\0")
 
