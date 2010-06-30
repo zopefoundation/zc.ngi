@@ -60,7 +60,7 @@ Implementing Network Clients
 
 Network clients make connections to and then use these connections to
 communicate with servers.  To do so, a client must be provided with an
-IConnector implantation.  How this happens is outside the scope of
+IConnector implementation.  How this happens is outside the scope of
 the NGI.  An IConnector implementation could, for example, be provided
 via the Zope component architecture, or via pkg_resources entry
 points.
@@ -236,7 +236,7 @@ implement a simple echo server:
     ...     def handle_close(self, connection, reason):
     ...         print 'server closed:', reason
 
-Out EchoServer *class* provides IServer and implement IInputHandler.
+Our EchoServer *class* provides IServer and implements IInputHandler.
 
 To use a server, we need a listener.  We'll use the use the testing
 listener:
@@ -305,7 +305,7 @@ access to the active connections:
     >>> connection2 in list(listener.connections())
     True
 
-Server connections have a control attribute that is the connections
+Server connections have a control attribute that is the connection's
 server control:
 
     >>> connection.control is listener
@@ -381,7 +381,7 @@ Text output
 ===========
 
 If the output from an application consists of short lines of text, a
-TextConnection can be used.  A TextConnection simply outputs it's data
+TextConnection can be used.  A TextConnection simply outputs its data
 directly.
 
     >>> connection = zc.ngi.testing.TextConnection()
@@ -412,7 +412,7 @@ It is sometimes useful to connect a client handler and a server
 handler.  Listeners created with the zc.ngi.testing.listener class have a
 connect method that can be used to create connections to a server.
 
-Let's connect out echo server and client. First, we'll create out
+Let's connect our echo server and client. First, we'll create our
 server using the listener constructor:
 
     >>> listener = zc.ngi.testing.listener(EchoServer)
@@ -434,7 +434,7 @@ Then we'll use the connect method on the listener:
 .. Peer connectors
 
   Below is an older API for connecting servers and clients in a
-  testing environment.  The mechanisms defined above are prefered.
+  testing environment.  The mechanisms defined above are preferred.
 
   The zc.ngi.testing.peer function can be used to create a
   connection to a peer handler. To illustrate, we'll set up an echo
@@ -455,7 +455,7 @@ Then we'll use the connect method on the listener:
 UDP Support
 ===========
 
-To send a UDP message, just use an implementations udp method:
+To send a UDP message, just use an implementation's udp method:
 
     >>> zc.ngi.testing.udp(('', 42), "hello")
 
