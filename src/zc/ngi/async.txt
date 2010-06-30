@@ -17,7 +17,7 @@ loop on import.
 
 There's nothing else to say about the implementation from a usage
 point of view.  The remainder of this document provides a
-demonstration (test) of using the impemantation to create a simple
+demonstration (test) of using the implementation to create a simple
 word-count server and client.
 
 Demonstration: wordcount
@@ -69,7 +69,7 @@ we'll use the blocking interface:
 
    If we pass a non-iterable to writelines, we'll get an immediate
    error.  To demonstrate this we'll violate our output file and
-   access it's _connection attribute so that we can bypass the check
+   access its _connection attribute so that we can bypass the check
    in the blocking writelines method:
 
     >>> output._connection.writelines(2) # doctest: +ELLIPSIS
@@ -107,7 +107,7 @@ we'll use the blocking interface:
     IOError: I/O operation on closed file
 
   Handler errors cause connections to be closed.  To see this, we'll
-  send the server an error message, which foreces an error:
+  send the server an error message, which forces an error:
 
     >>> output, input = zc.ngi.blocking.open(addr, zc.ngi.async.connect,
     ...                                      timeout=1.0)

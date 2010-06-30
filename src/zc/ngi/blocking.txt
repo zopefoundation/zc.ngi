@@ -52,7 +52,7 @@ which is a documenty consisting of the letter "C":
 
     >>> output.write("C\0")
 
-This causes the server to close the connection after it has sent it's
+This causes the server to close the connection after it has sent its
 data.
 
 We can use the read function to read either a fixed number of bytes

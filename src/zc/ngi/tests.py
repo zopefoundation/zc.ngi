@@ -33,7 +33,7 @@ def test_async_cannot_connect():
     >>> lock = threading.Lock()
     >>> _ = lock.acquire()
 
-    We define a simple handler that just notifies of failed connectioons.
+    We define a simple handler that just notifies of failed connections.
 
     >>> class Handler:
     ...     def failed_connect(connection, reason):

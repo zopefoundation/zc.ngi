@@ -2,7 +2,7 @@ Additional testing tests
 ========================
 
 The NGI promises that application handler calls are single threaded.
-Handlers aren't called simultaniously.  The testing implementation has
+Handlers aren't called simultaneously.  The testing implementation has
 to take special care to avoid calling handlers recursively.  Here's a
 simple example:
 
