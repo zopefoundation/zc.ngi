@@ -18,6 +18,7 @@ import manuel.doctest
 import manuel.testing
 import sys
 import threading
+import time
 import unittest
 import zc.ngi.async
 import zc.ngi.generator
@@ -120,9 +121,15 @@ def failure_to_bind_removes_listener_from_socket_map():
     ...    else: break
     ... else: print 'woops'
 
+    Make sure thread is running by creating a listener
+
+    >>> place_holder = zc.ngi.async.listener(None, lambda _: None)
+    >>> time.sleep(.1)
+
     Get size of socket map:
 
-    >>> size = len(zc.ngi.async._map)
+    >>> len(zc.ngi.async._map)
+    2
 
     Now, trying to create a listener on the port should fail, and the
     map should remain the same size.
@@ -131,8 +138,8 @@ def failure_to_bind_removes_listener_from_socket_map():
     ... except socket.error: pass
     ... else: print 'oops'
 
-    >>> len(zc.ngi.async._map) == size
-    True
+    >>> len(zc.ngi.async._map)
+    2
 
     >>> s.close()
 
@@ -148,8 +155,8 @@ def failure_to_bind_removes_listener_from_socket_map():
 
     Get size of socket map:
 
-    >>> zc.ngi.async.wait(1)
-    >>> size = len(zc.ngi.async._map)
+    >>> len(zc.ngi.async._map)
+    2
 
     Now, trying to create a listener on the port should fail, and the
     map should remain the same size.
@@ -158,10 +165,11 @@ def failure_to_bind_removes_listener_from_socket_map():
     ... except socket.error: pass
     ... else: print 'oops'
 
-    >>> len(zc.ngi.async._map) == size
-    True
+    >>> len(zc.ngi.async._map)
+    2
 
     >>> s.close()
+    >>> place_holder.close()
     """
 
 def async_error_in_client_when_conection_is_closed():
@@ -218,8 +226,6 @@ Similarly if the server closes the connection:
     >>> logger.setLevel(logging.NOTSET)
 
     >>> listener.close()
-    >>> zc.ngi.async.wait(1)
-
     """
 
 def when_a_server_closes_a_connection_blocking_request_returns_reason():
