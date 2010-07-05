@@ -199,7 +199,7 @@ If a connection is closed, we need to make sure write calls generate errors.
 
     >>> connector = Connector()
     >>> zc.ngi.async.connect(listener.address, connector)
-    >>> connector.event.wait(1)
+    >>> _ = connector.event.wait(1)
 
 OK, we've connected.  If we close the connection, we won't be able to write:
 
@@ -212,9 +212,9 @@ Similarly if the server closes the connection:
 
     >>> connector = Connector()
     >>> zc.ngi.async.connect(listener.address, connector)
-    >>> connector.event.wait(1)
+    >>> _ = connector.event.wait(1)
 
-    >>> connector.conn.write('aaa'); server_event.wait(1)
+    >>> connector.conn.write('aaa'); _ = server_event.wait(1)
     aaa
 
     >>> connector.conn.write('xxx')
@@ -348,7 +348,7 @@ def async_handling_iteration_errors():
     ...        print 'closed', reason
     ...        event.set()
 
-    >>> zc.ngi.async.connect(listener.address, Bad()); event.wait(1)
+    >>> zc.ngi.async.connect(listener.address, Bad()); _ = event.wait(1)
     closed Bad instance has no attribute 'handle_exception'
 
     >>> listener.close()

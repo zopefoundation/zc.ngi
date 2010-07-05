@@ -132,7 +132,7 @@ we'll use the blocking interface:
 
     >>> handler = LameClientConnectionHandler()
     >>> zc.ngi.async.connect(addr, handler)
-    >>> event.wait(1)
+    >>> _ = event.wait(1)
 
     >>> print loghandler
     zc.ngi.async.client ERROR
@@ -159,7 +159,7 @@ we'll use the blocking interface:
 
     >>> handler = LameClientConnectionHandler()
     >>> zc.ngi.async.connect(addr, handler)
-    >>> event.wait(1)
+    >>> _ = event.wait(1)
 
     >>> print loghandler
     zc.ngi.async.client ERROR
