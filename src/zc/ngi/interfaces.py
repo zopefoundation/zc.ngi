@@ -21,7 +21,6 @@ def implements(*args):
 moduleProvides = implements
 
 try:
-    raise ImportError
     from zope.interface import Interface, Attribute, implements, moduleProvides
 except ImportError:
     pass
