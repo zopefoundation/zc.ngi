@@ -19,6 +19,9 @@ $Id$
 import sys
 import traceback
 import zc.ngi
+import zc.ngi.interfaces
+
+zc.ngi.interfaces.moduleProvides(zc.ngi.interfaces.IImplementation)
 
 class PrintingHandler:
 
@@ -44,13 +47,14 @@ class PrintingHandler:
 
 class Connection:
 
-    control = None
+    zc.ngi.interfaces.implements(zc.ngi.interfaces.IConnection)
 
     def __init__(self, peer=None, handler=PrintingHandler):
         self.handler = None
         self.closed = False
         self.input = ''
         self.exception = None
+        self.control = None
         if peer is None:
             peer = Connection(self)
             handler(peer)
@@ -160,17 +164,16 @@ class Connection:
         else:
             self._callHandler('handle_exception', exception)
 
+class _ServerConnection(Connection):
+    zc.ngi.interfaces.implements(zc.ngi.interfaces.IServerConnection)
+
 class TextPrintingHandler(PrintingHandler):
 
     def handle_input(self, connection, data):
         print data,
 
-class TextConnection(Connection):
-
-    control = None
-
-    def __init__(self, peer=None, handler=TextPrintingHandler):
-        Connection.__init__(self, peer, handler)
+def TextConnection(peer=None, handler=TextPrintingHandler):
+    return Connection(peer, handler)
 
 _connectable = {}
 _recursing = object()
@@ -202,6 +205,7 @@ def connectable(addr, connection):
     _connectable.setdefault(addr, []).append(connection)
 
 class listener:
+    zc.ngi.interfaces.implements(zc.ngi.interfaces.IListener)
 
     def __init__(self, addr, handler=None):
         if handler is None:
@@ -222,7 +226,7 @@ class listener:
         if self._handler is None:
             raise TypeError("Listener closed")
         if connection is None:
-            connection = Connection()
+            connection = _ServerConnection()
             peer = connection.peer
         else:
             peer = None
@@ -299,6 +303,7 @@ class test_udp_handler:
 
 _udp_handlers = {}
 class udp_listener:
+    zc.ngi.interfaces.implements(zc.ngi.interfaces.IUDPListener)
 
     def __init__(self, address, handler=None, buffer_size=4096):
         if handler is None:

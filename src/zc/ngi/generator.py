@@ -11,7 +11,7 @@
 # FOR A PARTICULAR PURPOSE.
 #
 ##############################################################################
-
+import zc.ngi.interfaces
 
 def handler(func=None, connection_adapter=None):
     if func is None:
@@ -19,6 +19,9 @@ def handler(func=None, connection_adapter=None):
     return Handler(func, connection_adapter)
 
 class Handler(object):
+    zc.ngi.interfaces.implements(zc.ngi.interfaces.IServer,
+                                 zc.ngi.interfaces.IClientConnectHandler,
+                                 )
 
     def __init__(self, func, connection_adapter):
         self.func = func
@@ -44,7 +47,13 @@ class Handler(object):
                 ConnectionHandler(self.func(inst, connection), connection)
                 )
 
+    connected = __call__
+
+    def failed_connect(self, reason):
+        raise zc.ngi.interfaces.ConnectionFailed(reason)
+
 class ConnectionHandler(object):
+    zc.ngi.interfaces.implements(zc.ngi.interfaces.IConnectionHandler)
 
     def __init__(self, gen, connection):
         try:

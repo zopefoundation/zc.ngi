@@ -1,3 +1,5 @@
+The blocking module is deprecated.
+
 =======================
 Blocking network access
 =======================
@@ -154,3 +156,39 @@ Like the open function, the connect function accepts a timeout:
 
     >>> 0.5 <= (time.time() - then) < 1
     True
+
+
+Blocking Client Requests
+========================
+
+    >>> import zc.ngi.generator
+    >>> @zc.ngi.generator.handler
+    ... def server(c):
+    ...     while 1:
+    ...         c.write((yield).upper())
+
+    >>> import zc.ngi.adapters
+    >>> @zc.ngi.adapters.Lines.handler
+    ... def client(c):
+    ...     c.write('ho world\n')
+    ...     print (yield)
+
+    >>> import zc.ngi.async
+    >>> address = 'ngiexample.zope.com', 9000
+    >>> zc.ngi.blocking.request(zc.ngi.async.connect, address, client)
+    ... # doctest: +ELLIPSIS
+    Traceback (most recent call last):
+    ...
+    ConnectionFailed: ...
+
+The connection above failed because there wasn't a listener.
+Let's try after starting a listener:
+
+    >>> listener = zc.ngi.async.listener(None, server)
+    >>> address = listener.address
+
+    >>> zc.ngi.blocking.request(zc.ngi.async.connect, address, client)
+    HO WORLD
+
+    >>> listener.close()
+    >>> zc.ngi.async.wait(1)

@@ -242,5 +242,9 @@ Trying to rebind to a port in use:
       unable to listen on ('127.0.0.1', 9645)
 
     >>> listener.close()
-    >>> time.sleep(0.1)
+    >>> zc.ngi.async.cleanup_map()
+    >>> zc.ngi.async.wait(1)
     >>> loghandler.uninstall()
+
+.. cleanup
+

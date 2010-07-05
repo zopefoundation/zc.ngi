@@ -1,4 +1,3 @@
-
 Network Gateway Interface
 =========================
 
@@ -32,9 +31,9 @@ independently and provides greater separation of concerns. A testing
 implementation supports testing application code without making
 network calls.
 
-NGI defines 2 groups of interfaces, application and implementation.
+NGI defines 2 groups of interfaces: application and implementation.
 Application interfaces are implemented by people writing applications
-using NGI.
+and application-level libraries calling implemenytion interfaces.
 
 NGI is primarily an asynchronous event-driven networking library.  Applications
 provide handlers that respond to network events.  The application
@@ -129,15 +128,305 @@ methods, is written to standard output preceded by "-> "::
     >>> handler.handle_close(connection, 'done')
     closed done
 
-Imperative handlers using generators
-------------------------------------
+Implementing servers
+====================
 
-Let's look at a slightly more complicated example.  We'll implement
-a simple word-count server connection handler that implements something
-akin to the Unix ``wc`` command.  It takes a line of input
-containing a text length followed by length bytes of data.  After
-receiving the length bytes of data, it sends back a line of data
-containing line and word counts::
+Implementing servers is only slightly more involved that implementing
+connection handlers.  A server is just a callable that takes a
+connection and gives it a handler.  For example, we can use a simple
+function to implement a server for the Echo handler::
+
+    def echo_server(connection):
+        connection.setHandler(Echo())
+
+.. -> src
+
+    >>> exec(src)
+
+Listening for connections
+-------------------------
+
+Finally, we have to listen for connections on an address by calling an
+implementation's ``listener`` method.  NGI comes with 2 implementation
+modules [#twistedimplementations]_.  The ``zc.ngi.testing`` module
+provides an implementation for testing applications.
+
+The ``zc.ngi.async`` module provides a collection of implementations
+based on the ``asyncore`` module from the Python standard library.
+These implentations differ based on the way they handle threads.
+Perhaps the simplest of these is the ``zc.ngi.async.main``
+implementation::
+
+    import zc.ngi.async
+
+    address = 'localhost', 8000
+    listener = zc.ngi.async.main.listener(address, echo_server)
+    zc.ngi.async.main.loop()
+
+.. -> src
+
+    >>> src = src.replace("'localhost', 8000", "None") # pick addr
+    >>> src = src.replace("zc.ngi.async.main.loop()", "")
+    >>> src += """
+    ... import threading
+    ... thread = threading.Thread(target=zc.ngi.async.main.loop)
+    ... thread.setDaemon(True)
+    ... thread.start()
+    ... """
+    >>> exec(src)
+    >>> import zc.ngi.adapters
+    >>> @zc.ngi.adapters.Lines.handler
+    ... def one(c):
+    ...     c.write('one\n')
+    ...     print (yield)
+    >>> zc.ngi.async.connect(listener.address, one); zc.ngi.async.wait(1)
+    ONE
+    closed end of input
+
+    >>> listener.close()
+
+    >>> thread.join()
+    >>> del thread, one
+
+In this example, we listen for connections to our echo server on port
+8000.  The listener method returns a listener object. We'll say more
+about these objects in a little bit.  We then call the
+``zc.ngi.async.main.loop`` method, which blocks until either:
+
+- A handler raises an exception, or
+
+- there are no active handlers.
+
+I encourage you to try the above example. Write a script that contains
+the ``Echo`` and ``echo_server`` implementations and that calls
+``zc.ngi.async.main.listener`` and ``zc.ngi.async.main.main`` as shown
+above.  Run the script in a shell/terminal window and, in a separate
+window, telnet to your server and type some text.
+
+Implementing servers as connection handler classes
+--------------------------------------------------
+
+It's often simplest to implement a server using a connection handler
+class that takes a connection in it's constructor:
+
+  class EchoServer:
+
+      def __init__(self, connection):
+          connection.setHandler(self)
+
+      def handle_input(self, connection, data):
+          connection.write(data.upper())
+
+      def handle_close(self, connection, reason):
+          print 'closed', reason
+
+      def handle_exception(self, connection, exception):
+          print 'oops', exception
+
+.. -> src
+
+    >>> exec(src)
+
+    >>> handler = EchoServer(connection)
+    >>> connection.peer.write('Hi world')
+    -> 'HI WORLD'
+    >>> connection.peer.close()
+    closed closed
+
+Remember a server is just a callable that takes a connection and
+sets its handler.
+
+Testing servers
+---------------
+
+When testing servers, we'll often use the
+``zc.ngi.testing.listener`` function::
+
+    >>> listener = zc.ngi.testing.listener(address, EchoServer)
+
+Generally, the address will either be a host/port tuple or the name of
+a Unix domain socket, although an implementation may define a custom
+address representation.  The ``zc.ngi.testing.listener`` function will
+take any hashable address object.
+
+We can connect to a *testing* listener using its connect method::
+
+    >>> connection = listener.connect()
+
+The connection returned from ``listener.connect`` is not the connection
+passed to the server.  Instead, it's a test connection that we can use
+as if we're writing a client::
+
+    >>> connection.write('Hi\nthere.')
+    -> 'HI\nTHERE.'
+
+It is actually a peer of the connection passed to the server. Testing
+connections have peer attributes that you can use to get to the peer
+connection::
+
+    >>> connection.peer.peer is connection
+    True
+    >>> list(listener.connections()) == [connection.peer]
+    True
+
+The test connection has a default handler that just prints data to
+standard output, but we can call ``setHandler`` on it to use a different
+handler::
+
+    >>> class Handler:
+    ...     def handle_input(self, connection, data):
+    ...         print 'got', `data`
+    >>> connection.setHandler(Handler())
+    >>> connection.write('take this')
+    got 'TAKE THIS'
+
+Now, the data sent back from the server is handled by our custom
+handler, rather than the default one.
+
+.. cleanup
+
+    >>> listener.close()
+    closed stopped
+
+Listener objects
+----------------
+
+Listener objects, returned by an implementation's ``listener`` method,
+provide methods for controlling listeners.  The connections method
+returns an iterable of open connections to a server::
+
+    >>> list(listener.connections())
+    []
+
+We can stop listening by calling a listener's close method::
+
+    >>> listener.close()
+
+
+.. XXX Future
+
+  There's also a ``close_wait`` method that stops listening and waits
+  for a given period of time for clients to finish on their own before
+  closing them.
+
+
+Threading
+=========
+
+NGI tries to accommodate threaded applications without imposing
+thread-safety requirements.
+
+- Implementation (``IImplementation``) methods ``connect``, ``listener``,
+  ``udp`` and ``udp_listener`` are thread safe. They may be called at
+  any time by any thread.
+
+- Connection (``IConnection``) methods ``write``, ``writelines``, and
+  ``close`` are  thread safe. They may be called at
+  any time by any thread.
+
+  The connection setHandler method must only be called in a connect
+  handler's ``connected`` method or a connection handler's
+  ``handle_input`` method.
+
+- Listener (``IListener``) methods ``connections`` and ``close`` are
+  thread safe.  They may be called at
+  any time by any thread.
+
+- Application handler methods need not be thread safe.  NGI
+  implementations will never call them from more than one thread at a
+  time.
+
+``zc.ngi.async`` implementations and threading
+----------------------------------------------
+
+The ``zc.ngi.async`` module provides a number of threading models. The
+``zc.ngi.async`` module works by running one or more "loops".
+These loops wait for networking events and call application handlers.
+
+One application-controlled main loop
+    In this model, the application is responsible for calling
+    ``zc.ngi.async.main.loop``, typically from an application's main
+    thread.  This is most appropriate for simple single-threaded
+    applications that do nothing but respond to application events.
+
+    The ``loop`` call blocks until an exception is raised by a handler or
+    until there are no more handlers registered with the implementation.
+
+One ``zc.ngi.async``-controlled loop In this model, the
+    ``zc.ngi.async`` module maintains its own loop thread.  This is
+    the default implementation, provided by the module itself.  It is
+    appropriate when implementingh libraries that perform networking
+    to perform their function. The advantage of this approach is that
+    it is less intrusive to applications.  The loop thread is managed
+    automatically.
+
+    Note that the thread used by ``zc.ngi.async`` is "daemonic", meaning
+    that if the main program thread exits, the ``zc.ngi.async`` thread
+    won't keep the program running.  If a program registers handlers with
+    the ``zc.ngi.async`` implementation and then exists, the program will
+    exit without the handlers being called.  If the application doesn't
+    have other work to do, it should use ``zc.ngi.async.main`` or take
+    other steps to keep the application running.
+
+Multiple ``zc.ngi.async`` implementations and implementation-managed threads
+    You can instantiate ``zc.ngi.async.Implementation`` objects, which
+    provide the :class:`~zc.ngi.interfaces.IImplementation` interface and
+    each have their own networking loop, running in a separate thread.
+    For example, if you have an application that has multiple network
+    servers or multiple long-lived clients, it can be desireable to run
+    each using it's own implementation.
+
+Multiple ``zc.ngi.async`` implementations and application-managed threads
+    You can instantiate ``zc.ngi.async.Inline`` objects, which provide
+    the :class:`~zc.ngi.interfaces.IImplementation` interface and have
+    a blocking loop method that you must call yourself.  Use this
+    implementation class to manage threads yourself.  The loop method
+    returns when an exceptiuon is raised by a handler or when there
+    are no handlers registered with the implementation.
+    ``zc.ngi.async.main`` is a ``zc.ngi.async.Inline`` instance.
+
+Performance issues with a single loop
+-------------------------------------
+
+With a single loop, all networking activity is done in one thread.
+If a handler takes a long time to perform some function, it can
+prevent other networking activity from propceeding. For this reason,
+when a single loop is used, it's important that handlers perform their
+work quickly, without blocking for any length of time.
+
+If a loop is only servicing a single handler, or a small number of
+handlers, it's not a problem if a handler takes along time to respond
+to a network event.
+
+If you need to do a lot of work in response to network events,
+consider using multiple loops, or using thread pools (or
+multipprocessing pools) connected to your handlers with queues.
+
+Threads are heavier than handlers
+---------------------------------
+
+If you're going to be dealing with lots of network connections, it's
+probably better to use a single loop (or few loops) and use
+non-blocking handlers. Many non-blocking handlers can be efficiently
+managed at once.  Compared to handlers, threads are relatively heavy
+weight, with large memory requirements and relatively long start-up times.
+
+Imperative handlers using generators
+====================================
+
+We saw earlier that we implemented connection handlers by implementing
+the :class:`~zc.ngi.interfaces.IConnectionHandler` in a class that
+provided, at a minmimum, a ``handle_input`` method.  This is pretty
+straightforward.  The ``handle_input`` method simply reacts to input data.
+Unfortunately, for many applications, this can make applicatiomn logic
+harder to express.  Sometimes, a more imperative style leads to
+simpler applicatiuon logic.
+
+Let's look at an example.  We'll implement a simple word-count server
+connection handler that implements something akin to the Unix ``wc``
+command.  It takes a line of input containing a text length followed
+by length bytes of data.  After receiving the length bytes of data, it
+sends back a line of data containing line and word counts::
 
   class WC:
 
@@ -206,10 +495,11 @@ generators, using the ``zc.ngi.generator.handler`` decorator::
     >>> exec(src)
 
 The generator takes a connection object and gets data via ``yield``
-statements.  The yield statements can raise exceptions.  In
-particular, a ``GeneratorExit`` exception is raised when the connection is
-closed.  The ``yield`` statement will also (re)raise any exceptions raised
-when calling an iterator passed to ``writelines``.
+expressions.  The yield expressions can raise exceptions.  In
+particular, a ``GeneratorExit`` exception is raised when the
+connection is closed by the connection peer.  The ``yield`` statement
+will also (re)raise any exceptions raised when calling an iterator
+passed to ``writelines``.
 
 A generator-based handler is instantiated by calling it with a
 connection object::
@@ -221,206 +511,28 @@ connection object::
 
     >>> handler.handle_close(connection, 'done')
 
-Implementing servers
-====================
+There are a number of things to note about generator-based handlers:
 
-Implementing servers is only slightly more involved that implementing
-connection handlers.  A server is just a callable that takes a
-connection and gives it a handler.  For example, we can use a simple
-function to implement a server for the Echo handler::
+- The logic is expressed imperatively.  We don't have to keep track of
+  what mode we're in.  We progress naturally from one mode to another
+  as we progress through the generator function logic.
 
-    def echo_server(connection):
-        connection.setHandler(Echo())
+- A handler is implemented as a function, rather than a class.
 
-.. -> src
+- The ``generator`` decorator creates an object that, when called with
+  a connection, returns an object that implements the full
+  :class:`~zc.ngi.interfaces.IConnectionHandler` interface.  The
+  optional methods are handled by throwing exceptions to the generator
+  function.  A generator function can handle these events by
+  providingh exception handlers.
 
-    >>> exec(src)
+- The ``generator`` decorator creates an object that implements
+  :class:`~zc.ngi.interfaces.IServer` and can be used as a server.
 
-It's usually simpler to just use a connection handler class as a
-server by calling setHandler in the constructor::
+- The ``generator`` decorator creates an object that minimally implements
+  :class:`~zc.ngi.interfaces.IClientConnectHandler` and can be used as
+  a client connectioon handler, as described later.
 
-  class Echo:
-
-      def __init__(self, connection):
-          connection.setHandler(self)
-
-      def handle_input(self, connection, data):
-          connection.write(data.upper())
-
-      def handle_close(self, connection, reason):
-          print 'closed', reason
-
-      def handle_exception(self, connection, exception):
-          print 'oops', exception
-
-.. -> src
-
-    >>> exec(src)
-
-In this case, the class is a server. It's instances are connection
-handlers.
-
-Handlers created from generators can be used as servers directly.
-
-Listening for connections
--------------------------
-
-Finally, we have to listen for connections on an address by calling an
-implementation's ``listener`` method.  NGI comes with 2 implementations
-[#twistedimplementations]_, an implementation based on the ``asyncore``
-module from the standard library, ``zc.ngi.async``, and a testing
-implementation, ``zc.ngi.testing``.  To listen for network
-connections on ``localhost`` port ``8000```, we'd use::
-
-    >>> import zc.ngi.async
-
-    >>> address = 'localhost', 8000
-    >>> listener = zc.ngi.async.listener(address, Echo)
-
-.. -> src
-
-    Serious hi jinks here. :) The above doctest only *looks* like a
-    doctest. We actually turn it into Python code and exec it below.
-    We do this so we can replace the code that sets address to set it
-    to None so that the listener will just pick an available address.
-
-    >>> exec(src.replace('>>> ', '').replace("'localhost', 8000", 'None'))
-
-    >>> import logging, sys
-    >>> loghandler = logging.StreamHandler(sys.stdout)
-    >>> logging.getLogger('zc.ngi').addHandler(loghandler)
-    >>> logging.getLogger('zc.ngi').setLevel(logging.ERROR)
-
-    Echo's ``handle_close`` is problematic when using async, due to timing
-    uncertainty.
-
-    >>> Echo.handle_close = lambda *args: None
-
-    >>> class EC:
-    ...     def connected(self, connection):
-    ...         connection.setHandler(self)
-    ...         connection.write('test data')
-    ...     input = ''
-    ...     def handle_input(self, connection, data):
-    ...         self.input += data
-    ...         if self.input == 'TEST DATA':
-    ...             print self.input
-    ...             connection.close()
-
-    >>> import zc.ngi.blocking, time
-    >>> address = listener.address
-
-    We need the ``time.sleep`` call to give the server time to
-    get its connection closed.
-
-    >>> zc.ngi.blocking.request(
-    ...     zc.ngi.async.connect, address, EC(), 3); time.sleep(.1)
-    TEST DATA
-
-
-The listener call immediately returns a listener object.  The
-servicing of requests is done in a separate daemon thread provided by
-``zc.ngi.async``.
-
-Listener objects, returned by an implementation's ``listener`` method,
-provide methods for controlling listeners.  The connections method
-returns an iterable of open connections to a server::
-
-    >>> list(listener.connections())
-    []
-
-We can stop listening by calling a listener's close method::
-
-    >>> listener.close()
-
-.. test it
-
-    >>> time.sleep(.1)
-    >>> zc.ngi.blocking.request(zc.ngi.async.connect, address, EC)
-    ... # doctest: +ELLIPSIS
-    Traceback (most recent call last):
-    ...
-    ConnectionFailed: ...
-
-.. XXX Future
-
-  There's also a ``close_wait`` method that stops listening and waits
-  for a given period of time for clients to finish on their own before
-  closing them.
-
-NGI doesn't keep the main thread running
-----------------------------------------
-
-An important thing to note about NGI is that it doesn't provide
-support for maintaining the main application thread. The threads it
-creates for itself are "daemon" threads, meaning they don't keep an
-application running when the main thread exits.  If a main program
-ended with an implementation's listener call. the program would likely
-exit before the listener had a chance to get and service any
-connections.
-
-It's up to you to keep an application running. Some frameworks provide
-a ``loop_forever`` call. The closest thing in NGI is::
-
-    import threading
-    event = Threading.Event()
-    event.wait()
-
-If you wanted to provide a way to gracefully shut down an application,
-you'd provide some communication channel, such as a signal handler,
-that closed any listeners and then set the event blocking the main
-thread from exiting.
-
-Testing servers
----------------
-
-When testing servers, we'll often use the
-``zc.ngi.testing.listener`` function::
-
-    >>> listener = zc.ngi.testing.listener(address, Echo)
-
-Generally, the address will either be a host/port tuple or the name of
-a Unix domain socket, although an implementation may define a custom
-address representation.  The ``zc.ngi.testing.listener`` function will
-take any hashable address object.
-
-We can connect to a *testing* listener using its connect method::
-
-    >>> connection = listener.connect()
-
-The connection returned from ``listener.connect`` is not the connection
-passed to the server.  Instead, it's a test connection that we can use
-as if we're writing a client::
-
-    >>> connection.write('Hi\nthere.')
-    -> 'HI\nTHERE.'
-
-It is actually a peer of the connection passed to the server. Testing
-connections have peer attributes that you can use to get to the peer
-connection::
-
-    >>> connection.peer.peer is connection
-    True
-    >>> list(listener.connections()) == [connection.peer]
-    True
-
-The test connection has a default handler that just prints data to
-standard output, but we can call ``setHandler`` on it to use a different
-handler::
-
-    >>> class Handler:
-    ...     def handle_input(self, connection, data):
-    ...         print 'got', `data`
-    >>> connection.setHandler(Handler())
-    >>> connection.write('take this')
-    got 'TAKE THIS'
-
-Now, the data sent back from the server is handled by our custom
-handler, rather than the default one.
-
-.. cleanup
-
-    >>> listener.close()
 
 Implementing clients
 ====================
@@ -435,7 +547,7 @@ if the connection succeeds and the handler's ``failed_connect`` method
 is called if it fails.
 
 Let's implement a word-count client.  It will take a string and use a
-work-count server to get its line and word counts::
+word-count server to get its line and word counts::
 
   class WCClient:
 
@@ -558,6 +670,13 @@ and, of course, a generator can be used in the connected method::
     Got still more text from server
     <BLANKLINE>
     -> CLOSE
+
+A generator can also be used as a client connect handler.  The
+``failed_connect`` method provided by a generator handler simply
+raises an exception.  For this reason, generator handlers are
+generally only appropriate in ad hoc situations, like simple client
+scripts, typically using ``zc.ngi.async.main``, where exceptions are
+propigated to the ``zc.ngi.async.main.loop`` call.
 
 Connecting
 ----------
@@ -718,96 +837,6 @@ will fail.  It will raise an exception if it's called in response to a
     For address, ('', 8000), a connect handler called connect from a
     failed_connect call.
 
-Connectors return immediately
------------------------------
-
-An important thing to note about making connections is that connector
-calls return immediately.  Connections are made and connection
-handlers are called in separate threads.  This means that you can have
-many outstanding connect requests active at once.  It also means that,
-as with servers, it is your responsibility to keep client programs
-running while handlers are doing their work.
-
-Blocking Client Requests
-------------------------
-
-Event-based APIs can be very convenient when implementing servers,
-and sometimes even when implementing clients.  In many cases though,
-simple clients can be problematic because, as mentioned in the
-previous section, calls to connectors are made in a separate thread. A
-call to an implementation's ``connect`` method returns immediately,
-before a connection is made and handled. A simple script that makes a
-single request to a server has to wait for a request to be completed
-before exiting.
-
-To support the common use case of a client that makes a single request
-(or small finite number of requests) to a server, the
-``zc.ngi.blocking`` module provides a ``request`` function that makes
-a single request and blocks until the request has completed. The
-request function takes a connector, an address, and a connect
-handler. In the example above, we used the ``zc.ngi.async``
-implementation's ``connect`` function as the connector.
-
-If the connection fails, an exeption is raised::
-
-    >>> import zc.ngi.blocking
-    >>> zc.ngi.blocking.request(zc.ngi.async.connect, address, WCClient)
-    ... # doctest: +ELLIPSIS
-    Traceback (most recent call last):
-    ...
-    ConnectionFailed: ...
-
-The connection above failed because there wasn't a listener.
-Let's try after starting a listener:
-
-.. let the listener pick the address below:
-
-    >>> address = None
-
-::
-
-    >>> listener = zc.ngi.async.listener(address, wc)
-
-.. use the listener's address
-
-    >>> address = listener.address
-
-::
-
-    >>> zc.ngi.blocking.request(zc.ngi.async.connect, address, WCClient('xxx'))
-    WCClient got 1 1
-    <BLANKLINE>
-
-You can also pass a connection handler or a generator handler to
-``zc.ngi.blocking.request``::
-
-    >>> @zc.ngi.generator.handler
-    ... def client(connection):
-    ...     data = "hello\nworld.\n"
-    ...     connection.write("%s\n%s" % (len(data), data))
-    ...     input = ''
-    ...     while '\n' not in input:
-    ...         input += (yield)
-    ...     print 'Got', input
-
-    >>> zc.ngi.blocking.request(zc.ngi.async.connect, address, client)
-    Got 3 2
-    <BLANKLINE>
-
-.. cleanup
-
-    >>> listener.close()
-
-The ``zc.ngi.blocking`` module has some other APIs for writing
-blocking network programs in an imperative style.  These were written
-before ``zc.ngi.generator`` and ``zc.ngi.blocking.request``. Now
-``zc.ngi.generator`` allows handlers to be written in an imperative
-style without giving up the advantages, especially for testing, of
-reactive handlers.  The ``zc.ngi.blocking.request`` function now
-makes it easy for simple client programs to wait for requests to
-complete.  For these reasons, the older blocking APIs are now
-deprecated.
-
 Connection Adapters
 ===================
 
@@ -950,6 +979,116 @@ generator-based handlers::
 Here we've defined a defined a generator-based adapter that uses the
 ``Lines`` adapter.
 
+Blocking client scripts
+=======================
+
+You may need to make a few networking requests in a script. You
+typically want to make the requests, block until they're done, and
+then go on about your business.  The ``zc.ngi.async`` implementations
+provide a ``wait`` method that can be used in this sitation. The
+`wait`` method blocks until there are no outstanding requests, or
+until an optional timeout has passed.
+
+For example, suppose a word-count server is running on an address.  We
+can use the following script to get the word counts for a set of
+strings::
+
+    result = []
+
+    def get_word_count(s):
+
+        @zc.ngi.adapters.Lines.handler
+        def getwc(connection):
+            connection.write("%s\n" % len(s))
+            connection.write(s)
+            result.append((yield))
+
+        zc.ngi.async.main.connect(address, getwc)
+
+    for s in 'Hello\nworld\n', 'hi\n':
+        get_word_count(s)
+
+    zc.ngi.async.main.wait(10)
+
+    print sorted(result)
+
+.. -> src
+
+    >>> src = src.replace("10", ".2") # don't wait so long
+
+    w/o timeout:
+
+    >>> listener = zc.ngi.async.listener(None, wc)
+    >>> address = listener.address
+    >>> exec(src)
+    ['2 1', '3 2']
+
+    >>> listener.close()
+
+    w timeout:
+
+    >>> import time
+    >>> @zc.ngi.generator.handler
+    ... def echo_slowly(c):
+    ...     s = (yield)
+    ...     time.sleep(.5)
+    ...     c.write(s.upper())
+
+    >>> listener = zc.ngi.async.listener(None, echo_slowly)
+    >>> address = listener.address
+
+    >>> exec(src)
+    Traceback (most recent call last):
+    ...
+    Timeout
+
+    >>> zc.ngi.async.main.wait(1) # wait for the slow echo to finish
+
+    >>> listener.close()
+
+    Now, try a non-inline version.
+
+    >>> impl = zc.ngi.async.Implementation()
+    >>> src = src.replace("zc.ngi.async.main", "impl")
+
+    w/o timeout:
+
+    >>> listener = zc.ngi.async.listener(None, wc)
+    >>> address = listener.address
+    >>> exec(src)
+    ['2 1', '3 2']
+
+    >>> listener.close()
+
+    w timeout:
+
+    >>> listener = zc.ngi.async.listener(None, echo_slowly)
+    >>> address = listener.address
+
+    >>> exec(src)
+    Traceback (most recent call last):
+    ...
+    Timeout
+
+    >>> listener.close()
+
+    Cleanup:
+
+    >>> zc.ngi.async.wait(1)
+
+If the wait call times out, a ``zc.ngi.interfaces.Timeout`` exception
+will be raised.
+
+Most scripts will use an ``Inline`` implementation, like
+``zc.ngi.async.main`` because errors raised by handlers are propagated
+to the callers.
+
+A possible advantage of the non-inline implementations
+(``zc.ngi.async`` and instances of ``zc.ngi.async.Implementation``) is
+that, because the network requests are handled in a separate thread,
+an application can do other work while requests are being handled and
+before calling wait.
+
 UDP
 ===
 
@@ -972,32 +1111,6 @@ implementation's ``udp_listener``::
     >>> listener.close()
     >>> zc.ngi.testing.udp(('', 8000), 'hello udp')
 
-Threading
-=========
-
-NGI tries to accommodate threaded applications without imposing
-thread-safety requirements.
-
-- Implementation (``IImplementation``) methods ``connect``, ``listener``,
-  ``udp`` and ``udp_listener`` are thread safe. They may be called at
-  any time by any thread.
-
-- Connection (``IConnection``) methods ``write``, ``writelines``, and
-  ``close`` are  thread safe. They may be called at
-  any time by any thread.
-
-  The connection setHandler method must only be called in a connect
-  handler's ``connected`` method or a connection handler's
-  ``handle_input`` method.
-
-- Listener (``IListener``) methods ``connections`` and ``close`` are
-  thread safe.  They may be called at
-  any time by any thread.
-
-- Application handler methods need not be thread safe.  NGI
-  implementations will never call them from more than one thread at a
-  time.
-
 ----------------------
 
 .. [#twisted] The Twisted networking framework also provides this
@@ -1005,14 +1118,11 @@ thread-safety requirements.
    testing environment as NGI does, although it's likely that it will
    in the future.
 
+   A twisted implementation for NGI is planned.
+
 .. [#writelines] The ``writelines`` method takes an iterable object.
 
 .. [#twistedimplementations] A number of implementations based on
    Twisted are planned, including a basic Twisted implementation and
    an implementation using ``twisted.conch`` that will support
    communication over ssh channels.
-
-.. cleanup
-
-    >>> logging.getLogger('zc.ngi').removeHandler(loghandler)
-    >>> logging.getLogger('zc.ngi').setLevel(logging.NOTSET)

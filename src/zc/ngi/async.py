@@ -13,6 +13,7 @@
 ##############################################################################
 """Asyncore-based implementation of the NGI
 """
+from __future__ import with_statement
 
 import asyncore
 import errno
@@ -21,8 +22,11 @@ import os
 import socket
 import sys
 import threading
-
+import time
 import zc.ngi
+import zc.ngi.interfaces
+
+zc.ngi.interfaces.moduleProvides(zc.ngi.interfaces.IImplementation)
 
 pid = os.getpid()
 is_win32 = sys.platform == 'win32'
@@ -43,24 +47,31 @@ expected_socket_write_errors = {
 BUFFER_SIZE = 8*1024
 
 class Implementation:
+    zc.ngi.interfaces.implements(zc.ngi.interfaces.IImplementation)
 
-    def __init__(self):
+    def __init__(self, daemon=True, name='zc.ngi.async application created'):
+        self.name = name
+        self.daemon = daemon
         self._map = {}
-        self._trigger = _Trigger(self._map)
-        self.notify_select = self._trigger.pull_trigger
+        self._callbacks = []
         self._start_lock = threading.Lock()
 
     def call_from_thread(self, func):
-        self._trigger.callbacks.append(func)
+        self._callbacks.append(func)
         self.notify_select()
+        self.start_thread()
+
+    def notify_select(self):
+        pass
 
     def connect(self, addr, handler):
-        self.start_thread()
         self.call_from_thread(lambda : _Connector(addr, handler, self))
+        self.start_thread()
 
     def listener(self, addr, handler):
+        result = _Listener(addr, handler, self)
         self.start_thread()
-        return _Listener(addr, handler, self)
+        return result
 
     def udp(self, address, message):
         if isinstance(address, str):
@@ -76,42 +87,102 @@ class Implementation:
         _udp_socks[family].append(sock)
 
     def udp_listener(self, addr, handler, buffer_size=4096):
+        result = _UDPListener(addr, handler, buffer_size, self)
         self.start_thread()
-        return _UDPListener(addr, handler, buffer_size, self)
+        return result
 
     _thread = None
-    def start_thread(self, daemon=True, name=__name__):
-        self._start_lock.acquire()
-        try:
+    def start_thread(self, daemon=True):
+        with self._start_lock:
             if self._thread is None:
-                self._thread = threading.Thread(target=self._loop, name=name)
-                self._thread.setDaemon(True)
+                self._thread = threading.Thread(
+                    target=self.loop, name=self.name)
+                self._thread.setDaemon(self.daemon)
                 self._thread.start()
-        finally:
-            self._start_lock.release()
 
-    def _loop(self):
-        timeout = 30.0
+    def wait(self, timeout=None):
+        with self._start_lock:
+            if self._thread is None:
+                return
+            join = self._thread.join
+        join(timeout)
+        if self._thread is not None:
+            raise zc.ngi.interfaces.Timeout
+
+    def loop(self, timeout=None):
+        if timeout is not None:
+            deadline = time.time() + timeout
+        else:
+            deadline = None
+            timeout = 30
         map = self._map
+        callbacks = self._callbacks
         logger = logging.getLogger('zc.ngi.async.loop')
+        trigger = _Trigger(self._map)
+        self.notify_select = trigger.pull_trigger
 
-        while map:
-            try:
-                asyncore.poll(timeout, map)
-            except:
-                traceback.print_exception(*sys.exc_info())
-                #logger.exception('loop error')
-                raise
+        try:
+            while 1:
+
+                while callbacks:
+                    callback = callbacks.pop(0)
+                    try:
+                        callback()
+                    except:
+                        self.logger.exception('Calling callback')
+                        self.handle_error()
+
+                if deadline:
+                    timeout = min(deadline - time.time(), 30)
+
+                try:
+                    if (timeout > 0) and (len(map) > 1):
+                        asyncore.poll(timeout, map)
+                except:
+                    logger.exception('loop error')
+                    raise
+
+                if trigger._fileno is None:
+                    # oops, the trigger got closed.  Recreate it.
+                    trigger = _Trigger(self._map)
+                    self.notify_select = trigger.pull_trigger
+
+                with self._start_lock:
+                    if (len(map) <= 1) and not callbacks:
+                        self._thread = None
+                        return
+
+                if timeout <= 0:
+                    raise zc.ngi.interfaces.Timeout
+        finally:
+            del self.notify_select
+            trigger.close()
 
     def cleanup_map(self):
         for c in self._map.values():
             if isinstance(c, _Trigger):
                 continue
-            try:
-                del self._map[c.fileno()]
-            except KeyError:
-                pass
             c.close()
+        for c in self._map.values():
+            if isinstance(c, _Trigger):
+                continue
+            c.close()
+
+    def handle_error(self):
+        pass
+
+class Inline(Implementation):
+    """Run in an application thread, rather than a separate thread.
+    """
+
+    def start_thread(self):
+        pass
+
+    def handle_error(self):
+        raise
+
+    def wait(self, *args):
+        self.loop(*args)
 
 class dispatcher(asyncore.dispatcher):
 
@@ -130,6 +201,7 @@ class dispatcher(asyncore.dispatcher):
                 "Exception raised by dispatcher handle_close(%r)",
                 reason)
             self.close()
+        self.implementation.handle_error()
 
     def close(self):
         self.del_channel(self._map)
@@ -139,8 +211,7 @@ class dispatcher(asyncore.dispatcher):
         return False
 
 class _Connection(dispatcher):
-
-    control = None
+    zc.ngi.interfaces.implements(zc.ngi.interfaces.IConnection)
 
     def __init__(self, sock, addr, logger, implementation):
         self.__connected = True
@@ -194,8 +265,6 @@ class _Connection(dispatcher):
         self.__connected = False
         self.__output[:] = []
         dispatcher.close(self)
-        if self.control is not None:
-            self.control.closed(self)
         self.implementation.notify_select()
 
     def readable(self):
@@ -298,6 +367,19 @@ class _Connection(dispatcher):
     def handle_expt(self):
         self.handle_close('socket error')
 
+
+class _ServerConnection(_Connection):
+    zc.ngi.interfaces.implements(zc.ngi.interfaces.IServerConnection)
+
+    def __init__(self, sock, addr, logger, listener):
+        self.control = listener
+        _Connection.__init__(self, sock, addr, logger, listener.implementation)
+
+    def close(self):
+        _Connection.close(self)
+        self.control.closed(self)
+
+
 class _Connector(dispatcher):
 
     logger = logging.getLogger('zc.ngi.async.client')
@@ -347,10 +429,13 @@ class _Connector(dispatcher):
         if __debug__:
             self.logger.debug('connector close %r', reason)
         try:
-            self.__handler.failed_connect(reason)
-        except:
-            self.logger.exception("failed_connect(%r) failed", reason)
-        self.close()
+            try:
+                self.__handler.failed_connect(reason)
+            except:
+                self.logger.exception("failed_connect(%r) failed", reason)
+                self.implementation.handle_error()
+        finally:
+            self.close()
 
     def handle_write_event(self):
         err = self.socket.connect_ex(self.addr)
@@ -386,11 +471,16 @@ class _Connector(dispatcher):
                 "Handler failed_connect(%s) raised an exception", reason,
                 )
         self.close()
+        self.implementation.handle_error()
 
     def handle_expt(self):
         self.handle_close('connection failed')
 
 class BaseListener(asyncore.dispatcher):
+
+    def __init__(self, implementation):
+        self.implementation = implementation
+        asyncore.dispatcher.__init__(self, map=implementation._map)
 
     def writable(self):
         return False
@@ -407,18 +497,18 @@ class BaseListener(asyncore.dispatcher):
         #self.logger.exception('listener error')
         traceback.print_exception(*sys.exc_info())
         self.close()
+        self.implementation.handle_error()
 
 class _Listener(BaseListener):
+    zc.ngi.interfaces.implements(zc.ngi.interfaces.IListener)
 
     logger = logging.getLogger('zc.ngi.async.server')
 
     def __init__(self, addr, handler, implementation):
-        self.implementation = implementation
-        map = implementation._map
         self.__handler = handler
         self.__close_handler = None
         self.__connections = {}
-        asyncore.dispatcher.__init__(self, map=map)
+        BaseListener.__init__(self, implementation)
         if isinstance(addr, str):
             family = socket.AF_UNIX
         else:
@@ -453,7 +543,7 @@ class _Listener(BaseListener):
             self.logger.warn("unable to listen on %r", addr)
             raise
 
-        self.add_channel(map)
+        self.add_channel(self._map)
         self.address = addr
         self.implementation.notify_select()
 
@@ -475,9 +565,8 @@ class _Listener(BaseListener):
         if __debug__:
             self.logger.debug('incoming connection %r', addr)
 
-        connection = _Connection(sock, addr, self.logger, self.implementation)
+        connection = _ServerConnection(sock, addr, self.logger, self)
         self.__connections[connection] = 1
-        connection.control = self
         try:
             self.__handler(connection)
         except:
@@ -493,10 +582,8 @@ class _Listener(BaseListener):
             if not self.__connections and self.__close_handler:
                 self.__close_handler(self)
 
-    def close(self, handler=None):
-        self.accepting = False
-        self.del_channel(self._map)
-        self.implementation.call_from_thread(self.socket.close)
+    def _close(self, handler):
+        BaseListener.close(self)
         if handler is None:
             for c in list(self.__connections):
                 c.handle_close("stopped")
@@ -504,6 +591,15 @@ class _Listener(BaseListener):
             handler(self)
         else:
             self.__close_handler = handler
+
+    def close(self, handler=None):
+        self.accepting = False
+        self.implementation.call_from_thread(lambda : self._close(handler))
+
+    def close_wait(self, timeout=None):
+        event = threading.Event()
+        self.close(lambda _: event.set())
+        event.wait(timeout)
 
     # convenience method made possible by storing our address:
     def connect(self, handler):
@@ -515,11 +611,9 @@ class _UDPListener(BaseListener):
     connected = True
 
     def __init__(self, addr, handler, buffer_size, implementation):
-        self.implementation = implementation
-        map = implementation._map
         self.__handler = handler
         self.__buffer_size = buffer_size
-        asyncore.dispatcher.__init__(self, map=map)
+        BaseListener.__init__(self, implementation)
         if isinstance(addr, str):
             family = socket.AF_UNIX
         else:
@@ -534,7 +628,7 @@ class _UDPListener(BaseListener):
             self.close()
             self.logger.warn("unable to listen on udp %r", addr)
             raise
-        self.add_channel(map)
+        self.add_channel(self._map)
         self.implementation.notify_select()
 
     def handle_read(self):
@@ -559,9 +653,6 @@ class _Triggerbase(object):
 
     logger = logging.getLogger('zc.ngi.async.trigger')
 
-    def __init__(self):
-        self.callbacks = []
-
     def writable(self):
         return 0
 
@@ -573,13 +664,6 @@ class _Triggerbase(object):
         self.close()
 
     def handle_read(self):
-        while self.callbacks:
-            callback = self.callbacks.pop(0)
-            try:
-                callback()
-            except:
-                self.logger.exception('Calling callback')
-
         try:
             self.recv(BUFFER_SIZE)
         except socket.error:
@@ -589,7 +673,6 @@ if os.name == 'posix':
 
     class _Trigger(_Triggerbase, asyncore.file_dispatcher):
         def __init__(self, map):
-            _Triggerbase.__init__(self)
             r, self.__writefd = os.pipe()
             asyncore.file_dispatcher.__init__(self, r, map)
 
@@ -619,9 +702,6 @@ else:
 
     class _Trigger(_Triggerbase, asyncore.dispatcher):
         def __init__(self, map):
-            _Triggerbase.__init__(self)
-            _Triggerbase.__init__(self)
-
             # Get a pair of connected sockets.  The trigger is the 'w'
             # end of the pair, which is connected to 'r'.  'r' is put
             # in the asyncore socket map.  "pulling the trigger" then
@@ -685,7 +765,7 @@ else:
                 self.logger.debug('notify select %s', pid)
             self.trigger.send('x')
 
-_select_implementation = Implementation()
+_select_implementation = Implementation(name=__name__)
 
 call_from_thread = _select_implementation.call_from_thread
 connect = connector = _select_implementation.connect
@@ -695,3 +775,6 @@ udp = _select_implementation.udp
 udp_listener = _select_implementation.udp_listener
 _map = _select_implementation._map
 cleanup_map = _select_implementation.cleanup_map
+wait = _select_implementation.wait
+
+main = Inline()

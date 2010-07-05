@@ -1,3 +1,8 @@
+Much of the information here is a bit out of date, especially wrt the
+testing APIs.  Testing is now much simpler than it used to be.
+See doc/index.txt.
+
+
 =========================
 Network Gateway Interface
 =========================

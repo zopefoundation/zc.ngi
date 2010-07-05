@@ -11,14 +11,11 @@
 # FOR A PARTICULAR PURPOSE.
 #
 ##############################################################################
+from zc.ngi.interfaces import ConnectionFailed
 import sys
 import threading
 import time
 import zc.ngi
-
-class ConnectionFailed(Exception):
-    """A Connection attempt failed
-    """
 
 class Timeout(Exception):
     """An operation timed out.

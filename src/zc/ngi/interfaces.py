@@ -1,6 +1,6 @@
 ##############################################################################
 #
-# Copyright (c) 2006 Zope Corporation and Contributors.
+# Copyright (c) 2006-2010 Zope Foundation and Contributors.
 # All Rights Reserved.
 #
 # This software is subject to the provisions of the Zope Public License,
@@ -12,13 +12,19 @@
 #
 ##############################################################################
 
+class Interface:
+    pass
+def Attribute(text):
+    return text
+def implements(*args):
+    pass
+moduleProvides = implements
+
 try:
-    from zope.interface import Interface, Attribute
+    raise ImportError
+    from zope.interface import Interface, Attribute, implements, moduleProvides
 except ImportError:
-    class Interface:
-        pass
-    def Attribute(text):
-        return text
+    pass
 
 class IImplementation(Interface):
     """Standard interface for ngi implementations
@@ -126,7 +132,7 @@ class IServerConnection(IConnection):
     This is an implementation interface.
     """
 
-    control = Attribute("An IServerControl")
+    control = Attribute("An IListener")
 
 class IConnectionHandler(Interface):
     """Application objects that can handle connection input-data events
@@ -247,3 +253,11 @@ class IUDPListener(Interface):
     def close():
         """Close the listener
         """
+
+class ConnectionFailed(Exception):
+    """A Connection attempt failed
+    """
+
+class Timeout(Exception):
+    """Something took too long
+    """

@@ -24,8 +24,6 @@ import zc.ngi.generator
 import zc.ngi.testing
 import zc.ngi.wordcount
 
-zc.ngi.async.start_thread() # Make sure the thread is already running
-
 def test_async_cannot_connect():
     """Let's make sure that the connector handles connection failures correctly
 
@@ -56,10 +54,46 @@ def test_async_cannot_connect():
 
     """
 
-def async_thread_has_name():
+def async_thread_management():
     """
+
+    There's no thread by default:
+
+    >>> len([t for t in threading.enumerate() if t.getName() == 'zc.ngi.async'])
+    0
+
+    There's a default name:
+
+    >>> listener = zc.ngi.async.listener(None, lambda _: None)
     >>> len([t for t in threading.enumerate() if t.getName() == 'zc.ngi.async'])
     1
+    >>> listener.close()
+    >>> zc.ngi.async.wait(1)
+
+    When there's nothing to do, the thread goes away:
+
+    >>> len([t for t in threading.enumerate() if t.getName() == 'zc.ngi.async'])
+    0
+
+    If we create out own implementation, we can give it a name:
+
+    >>> impl = zc.ngi.async.Implementation(name='bob')
+    >>> listener = impl.listener(None, lambda _: None)
+    >>> len([t for t in threading.enumerate() if t.getName() == 'bob'])
+    1
+    >>> listener.close()
+    >>> impl.wait(1)
+
+    Otherwise, it gets a slightly more descriptive name:
+
+    >>> impl = zc.ngi.async.Implementation('')
+    >>> listener = impl.listener(None, lambda _: None)
+    >>> len([t for t in threading.enumerate()
+    ...     if t.getName() == 'zc.ngi.async application created'])
+    1
+    >>> listener.close()
+    >>> impl.wait(1)
+
     """
 
 def blocking_connector_handles_failed_connect():
@@ -114,6 +148,7 @@ def failure_to_bind_removes_listener_from_socket_map():
 
     Get size of socket map:
 
+    >>> zc.ngi.async.wait(1)
     >>> size = len(zc.ngi.async._map)
 
     Now, trying to create a listener on the port should fail, and the
@@ -181,6 +216,9 @@ Similarly if the server closes the connection:
 
     >>> logger.removeHandler(log_handler)
     >>> logger.setLevel(logging.NOTSET)
+
+    >>> listener.close()
+    >>> zc.ngi.async.wait(1)
 
     """
 
@@ -363,6 +401,9 @@ def async_evil_setup(test):
     zc.ngi.async.listener(addr, BrokenAfterConnect())
     zc.ngi.async.connect(addr, BrokenAfterConnect())
 
+def cleanup_async(test):
+    zc.ngi.async.cleanup_map()
+    zc.ngi.async.wait(1)
 
 def test_suite():
     return unittest.TestSuite([
@@ -380,9 +421,9 @@ def test_suite():
             ),
         doctest.DocFileSuite(
             'async.txt',
-            setUp=async_evil_setup,
+            setUp=async_evil_setup, tearDown=cleanup_async,
             ),
-        doctest.DocTestSuite(),
+        doctest.DocTestSuite(setUp=cleanup_async, tearDown=cleanup_async),
         ])
 
 if __name__ == '__main__':

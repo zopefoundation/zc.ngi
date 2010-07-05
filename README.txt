@@ -20,7 +20,7 @@ Changes
 *******
 
 ==================
-1.2.0 (2010-06-??)
+1.2.0 (2010-07-??)
 ==================
 
 New Features:
@@ -32,9 +32,8 @@ New Features:
 
 - Cleaner testing interfaces
 
-- Added a new blocking client request interface,
-  ``zc.ngi.blocking.request``.  Other older blocking APIs are
-  deprecated.
+- Refactored ``zc.ngi.async`` thread management to make the blocking
+  APIs unnecessary. ``zc.ngi.async.blocking`` is now deprecated.
 
 - Added support for running multiple ``async`` implementations in
   separate threads. This is useful in applications with fewer network
