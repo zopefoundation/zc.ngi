@@ -29,6 +29,8 @@ setup(
     keywords = ["networking", "testing"],
     url='http://packages.python.org/'+name,
     long_description=readme,
+    tests_require = tests_require,
+    test_suite = 'zc.ngi.tests.test_suite',
 
     packages = find_packages('src'),
     include_package_data = True,
