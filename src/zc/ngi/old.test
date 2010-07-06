@@ -56,8 +56,8 @@ application code.
 
     >>> import zc.ngi.testing
 
-The testing module provides IConnection, IConnector, and IListener
-implementations. We'll use this below to illustrate how application code
+The testing module provides an IImplementation
+implementation. We'll use this below to illustrate how application code
 is written.
 
 Implementing Network Clients
@@ -65,8 +65,8 @@ Implementing Network Clients
 
 Network clients make connections to and then use these connections to
 communicate with servers.  To do so, a client must be provided with an
-IConnector implementation.  How this happens is outside the scope of
-the NGI.  An IConnector implementation could, for example, be provided
+IImplementation implementation.  How this happens is outside the scope of
+the NGI.  An IImplementation implementation could, for example, be provided
 via the Zope component architecture, or via pkg_resources entry
 points.
 
@@ -241,7 +241,7 @@ implement a simple echo server:
     ...     def handle_close(self, connection, reason):
     ...         print 'server closed:', reason
 
-Our EchoServer *class* provides IServer and implements IInputHandler.
+Our EchoServer *class* provides IServer and implements IConnectionHandler.
 
 To use a server, we need a listener.  We'll use the use the testing
 listener:
