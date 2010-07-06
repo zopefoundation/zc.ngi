@@ -352,13 +352,13 @@ One application-controlled main loop
     The ``loop`` call blocks until an exception is raised by a handler or
     until there are no more handlers registered with the implementation.
 
-One ``zc.ngi.async``-controlled loop In this model, the
-    ``zc.ngi.async`` module maintains its own loop thread.  This is
-    the default implementation, provided by the module itself.  It is
-    appropriate when implementing libraries that perform networking
-    to perform their function. The advantage of this approach is that
-    it is less intrusive to applications.  The loop thread is managed
-    automatically.
+One ``zc.ngi.async``-controlled loop
+    In this model, the ``zc.ngi.async`` module maintains its own loop
+    thread.  This is the default implementation, provided by the
+    module itself.  It is appropriate when implementing libraries that
+    perform networking to perform their function. The advantage of
+    this approach is that it is less intrusive to applications.  The
+    loop thread is managed automatically.
 
     Note that the thread used by ``zc.ngi.async`` is "daemonic", meaning
     that if the main program thread exits, the ``zc.ngi.async`` thread
