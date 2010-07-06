@@ -33,7 +33,7 @@ network calls.
 
 NGI defines 2 groups of interfaces: application and implementation.
 Application interfaces are implemented by people writing applications
-and application-level libraries calling implemenytion interfaces.
+and application-level libraries calling implementation interfaces.
 
 NGI is primarily an asynchronous event-driven networking library.  Applications
 provide handlers that respond to network events.  The application
@@ -153,7 +153,7 @@ provides an implementation for testing applications.
 
 The ``zc.ngi.async`` module provides a collection of implementations
 based on the ``asyncore`` module from the Python standard library.
-These implentations differ based on the way they handle threads.
+These implementations differ based on the way they handle threads.
 Perhaps the simplest of these is the ``zc.ngi.async.main``
 implementation::
 
@@ -355,7 +355,7 @@ One application-controlled main loop
 One ``zc.ngi.async``-controlled loop In this model, the
     ``zc.ngi.async`` module maintains its own loop thread.  This is
     the default implementation, provided by the module itself.  It is
-    appropriate when implementingh libraries that perform networking
+    appropriate when implementing libraries that perform networking
     to perform their function. The advantage of this approach is that
     it is less intrusive to applications.  The loop thread is managed
     automatically.
@@ -373,7 +373,7 @@ Multiple ``zc.ngi.async`` implementations and implementation-managed threads
     provide the :class:`~zc.ngi.interfaces.IImplementation` interface and
     each have their own networking loop, running in a separate thread.
     For example, if you have an application that has multiple network
-    servers or multiple long-lived clients, it can be desireable to run
+    servers or multiple long-lived clients, it can be desirable to run
     each using it's own implementation.
 
 Multiple ``zc.ngi.async`` implementations and application-managed threads
@@ -381,7 +381,7 @@ Multiple ``zc.ngi.async`` implementations and application-managed threads
     the :class:`~zc.ngi.interfaces.IImplementation` interface and have
     a blocking loop method that you must call yourself.  Use this
     implementation class to manage threads yourself.  The loop method
-    returns when an exceptiuon is raised by a handler or when there
+    returns when an exception is raised by a handler or when there
     are no handlers registered with the implementation.
     ``zc.ngi.async.main`` is a ``zc.ngi.async.Inline`` instance.
 
@@ -390,7 +390,7 @@ Performance issues with a single loop
 
 With a single loop, all networking activity is done in one thread.
 If a handler takes a long time to perform some function, it can
-prevent other networking activity from propceeding. For this reason,
+prevent other networking activity from proceeding. For this reason,
 when a single loop is used, it's important that handlers perform their
 work quickly, without blocking for any length of time.
 
@@ -400,7 +400,7 @@ to a network event.
 
 If you need to do a lot of work in response to network events,
 consider using multiple loops, or using thread pools (or
-multipprocessing pools) connected to your handlers with queues.
+multiprocessing pools) connected to your handlers with queues.
 
 Threads are heavier than handlers
 ---------------------------------
@@ -416,11 +416,11 @@ Imperative handlers using generators
 
 We saw earlier that we implemented connection handlers by implementing
 the :class:`~zc.ngi.interfaces.IConnectionHandler` in a class that
-provided, at a minmimum, a ``handle_input`` method.  This is pretty
+provided, at a minimum, a ``handle_input`` method.  This is pretty
 straightforward.  The ``handle_input`` method simply reacts to input data.
-Unfortunately, for many applications, this can make applicatiomn logic
+Unfortunately, for many applications, this can make application logic
 harder to express.  Sometimes, a more imperative style leads to
-simpler applicatiuon logic.
+simpler application logic.
 
 Let's look at an example.  We'll implement a simple word-count server
 connection handler that implements something akin to the Unix ``wc``
@@ -524,14 +524,14 @@ There are a number of things to note about generator-based handlers:
   :class:`~zc.ngi.interfaces.IConnectionHandler` interface.  The
   optional methods are handled by throwing exceptions to the generator
   function.  A generator function can handle these events by
-  providingh exception handlers.
+  providing exception handlers.
 
 - The ``generator`` decorator creates an object that implements
   :class:`~zc.ngi.interfaces.IServer` and can be used as a server.
 
 - The ``generator`` decorator creates an object that minimally implements
   :class:`~zc.ngi.interfaces.IClientConnectHandler` and can be used as
-  a client connectioon handler, as described later.
+  a client connection handler, as described later.
 
 
 Implementing clients
@@ -676,7 +676,7 @@ A generator can also be used as a client connect handler.  The
 raises an exception.  For this reason, generator handlers are
 generally only appropriate in ad hoc situations, like simple client
 scripts, typically using ``zc.ngi.async.main``, where exceptions are
-propigated to the ``zc.ngi.async.main.loop`` call.
+propagated to the ``zc.ngi.async.main.loop`` call.
 
 Connecting
 ----------
@@ -985,7 +985,7 @@ Blocking client scripts
 You may need to make a few networking requests in a script. You
 typically want to make the requests, block until they're done, and
 then go on about your business.  The ``zc.ngi.async`` implementations
-provide a ``wait`` method that can be used in this sitation. The
+provide a ``wait`` method that can be used in this situation. The
 `wait`` method blocks until there are no outstanding requests, or
 until an optional timeout has passed.
 
