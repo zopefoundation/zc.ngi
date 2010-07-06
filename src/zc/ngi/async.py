@@ -676,8 +676,14 @@ if os.name == 'posix':
             r, self.__writefd = os.pipe()
             asyncore.file_dispatcher.__init__(self, r, map)
 
-            # file_dispatcher dups r, so we don't need it any more
-            os.close(r)
+            if self.fd != r:
+                # Starting in Python 2.6, the descriptor passed to
+                # file_dispatcher gets duped and assigned to
+                # self.fd. This breaks the instantiation semantics and
+                # is a bug imo.  I dount it will get fixed, but maybe
+                # it will. Who knows. For that reason, we test for the
+                # fd changing rather than just checking the Python version.
+                os.close(r)
 
         def close(self):
             os.close(self.__writefd)
