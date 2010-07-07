@@ -20,10 +20,18 @@ import sys
 import threading
 import time
 import unittest
+import warnings
 import zc.ngi.async
 import zc.ngi.generator
 import zc.ngi.testing
 import zc.ngi.wordcount
+
+if sys.version_info >= (2, 6):
+    # silence blocking deprecation warning
+    with warnings.catch_warnings(record=True):
+        # omg, without record=True, warnings aren't actually caught.
+        # Who thinks up this stuff?
+        import zc.ngi.blocking
 
 def test_async_cannot_connect():
     """Let's make sure that the connector handles connection failures correctly
@@ -342,7 +350,7 @@ def async_handling_iteration_errors():
     >>> event = threading.Event()
     >>> class Bad:
     ...    def connected(self, connection):
-    ...        connection.setHandler(self)
+    ...        connection.set_handler(self)
     ...        connection.writelines(XXX for i in range(2))
     ...    def handle_close(self, connection, reason):
     ...        print 'closed', reason
@@ -354,6 +362,106 @@ def async_handling_iteration_errors():
     >>> listener.close()
     """
 
+def assert_(cond, *args):
+    if not cond:
+        raise AssertionError(*args)
+
+def setHandler_compatibility():
+    """
+Make sure setHandler still works, with deprecation warnings:
+
+The testing connection warns:
+
+    >>> class Handler:
+    ...     def handle_input(self, connection, data):
+    ...         print 'got', `data`
+
+    >>> conn = zc.ngi.testing.Connection()
+    >>> with warnings.catch_warnings(record=True) as caught:
+    ...     conn.setHandler(Handler())
+    ...     assert_(len(caught) == 1, len(caught))
+    ...     assert_(caught[-1].category is DeprecationWarning)
+    ...     print caught[-1].message
+    setHandler is deprecated. Use set_handler,
+
+    >>> conn.test_input('test')
+    got 'test'
+
+The async connections warn:
+
+    >>> server_event = threading.Event()
+    >>> class server:
+    ...     def __init__(self, c):
+    ...         global server_caught
+    ...         with warnings.catch_warnings(record=True) as caught:
+    ...             c.setHandler(self)
+    ...             server_caught = caught
+    ...         server_event.set()
+    ...         c.close()
+
+    >>> client_event = threading.Event()
+    >>> class client:
+    ...
+    ...     def connected(self, c):
+    ...         global client_caught
+    ...         with warnings.catch_warnings(record=True) as caught:
+    ...             c.setHandler(self)
+    ...             client_caught = caught
+    ...         client_event.set()
+    ...         c.close()
+
+    >>> listener = zc.ngi.async.listener(None, server)
+    >>> zc.ngi.async.connect(listener.address, client())
+    >>> _ = server_event.wait(1)
+    >>> _ = client_event.wait(1)
+    >>> listener.close()
+
+    >>> assert_(len(server_caught) == 1)
+    >>> assert_(server_caught[0].category is DeprecationWarning)
+    >>> print server_caught[0].message
+    setHandler is deprecated. Use set_handler,
+
+    >>> assert_(len(client_caught) == 1)
+    >>> assert_(client_caught[0].category is DeprecationWarning)
+    >>> print client_caught[0].message
+    setHandler is deprecated. Use set_handler,
+
+    >>> zc.ngi.async.wait(1)
+
+The adapters warn:
+
+    >>> import zc.ngi.adapters
+    >>> with warnings.catch_warnings(record=True) as caught:
+    ...     conn = zc.ngi.adapters.Lines(zc.ngi.testing.Connection())
+    ...     conn.setHandler(Handler())
+    ...     assert_(len(caught) == 1)
+    ...     assert_(caught[-1].category is DeprecationWarning)
+    ...     print caught[-1].message
+    setHandler is deprecated. Use set_handler,
+
+    >>> class OldConn:
+    ...     def setHandler(self, h):
+    ...         print 'setHandler called'
+    ...         global old_handler
+    ...         old_handler = h
+
+    >>> with warnings.catch_warnings(record=True) as caught:
+    ...     conn = zc.ngi.adapters.Lines(OldConn())
+    ...     handler = Handler()
+    ...     conn.set_handler(handler)
+    ...     assert_(len(caught) == 1)
+    ...     assert_(caught[-1].category is DeprecationWarning)
+    ...     print caught[-1].message
+    ...     assert_(old_handler is conn)
+    setHandler called
+    setHandler is deprecated. Use set_handler,
+
+
+    """
+
+if sys.version_info < (2, 6):
+    del setHandler_compatibility
+
 class BrokenConnect:
 
     connected = failed_connect = __call__ = lambda: xxxxx
@@ -362,7 +470,7 @@ class BrokenAfterConnect:
 
     def connected(self, connection):
         connection.write("Hee hee\0")
-        connection.setHandler(self)
+        connection.set_handler(self)
 
     __call__ = connected
 
@@ -424,7 +532,7 @@ def test_suite():
             'adapters.test',
             'blocking.test',
             'async-udp.test',
-            ),
+            tearDown=cleanup_async),
         doctest.DocFileSuite(
             'async.test',
             setUp=async_evil_setup, tearDown=cleanup_async,
