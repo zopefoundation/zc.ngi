@@ -95,26 +95,28 @@ Each of the 3 methods takes a connection object, implementing
 handlers will call the ``write``, ``writelines`` [#writelines]_, or
 ``close`` methods from the handler's ``handle_input`` method.
 
-The handler's ``handle_close`` and ``handle_exception`` methods are optional.
-The ``handle_exception`` method is only called if an iterator created from
-an iterable passed to ``writelines`` raises an exception.  If a call to
-``handle_exception`` fails, an implementation will close the connection.
+The handler's ``handle_close`` and ``handle_exception`` methods are
+optional.  The ``handle_exception`` method is only called if an
+iterator created from an iterable passed to ``writelines`` raises an
+exception.  If a call to ``handle_exception`` fails, or if
+``handle_exception`` isn't implemented, an implementation will close
+the connection and call ``handle_close`` (if it is implemented).
 
-The ``handle_close`` method is called when a connection is closed other
-than through the connection handler calling the connection's ``close``
-method.  For many applications, this is uninteresting, which is why
-the method is optional.  Clients that maintain long-running
+The ``handle_close`` method is called when a connection is closed
+other than through the connection handler calling the connection's
+``close`` method.  For many applications, this is uninteresting, which
+is why the method is optional.  Clients that maintain long-running
 connections, may try to create new connections when notified that a
 connection has closed.
 
 Testing connection handlers
 ---------------------------
 
-Testing a connection handler is very easy.  Just call its methods
-passing suitable arguments. The ``zc.ngi.testing`` module provides a
+Testing a connection handler is easy.  Just call its methods passing
+suitable arguments. The ``zc.ngi.testing`` module provides a
 connection implementation designed to make testing convenient.  For
-example, to test our ``Echo`` connection handler, we can use code like the
-following::
+example, to test our ``Echo`` connection handler, we can use code like
+the following::
 
     >>> import zc.ngi.testing
     >>> connection = zc.ngi.testing.Connection()
@@ -122,7 +124,7 @@ following::
     >>> handler.handle_input(connection, 'hello out there')
     -> 'HELLO OUT THERE'
 
-Any data written to the connection, using its ``write`` or ``writelines``
+Any data written to the test connection, using its ``write`` or ``writelines``
 methods, is written to standard output preceded by "-> "::
 
     >>> handler.handle_close(connection, 'done')
@@ -133,11 +135,12 @@ Implementing servers
 
 Implementing servers is only slightly more involved that implementing
 connection handlers.  A server is just a callable that takes a
-connection and gives it a handler.  For example, we can use a simple
-function to implement a server for the Echo handler::
+connection and gives it a handler by calling ``set_hsndler``.  For
+example, we can use a simple function to implement a server for the
+Echo handler::
 
     def echo_server(connection):
-        connection.setHandler(Echo())
+        connection.set_handler(Echo())
 
 .. -> src
 
@@ -193,7 +196,7 @@ In this example, we listen for connections to our echo server on port
 about these objects in a little bit.  We then call the
 ``zc.ngi.async.main.loop`` method, which blocks until either:
 
-- A handler raises an exception, or
+- a handler raises an exception, or
 
 - there are no active handlers.
 
@@ -207,12 +210,12 @@ Implementing servers as connection handler classes
 --------------------------------------------------
 
 It's often simplest to implement a server using a connection handler
-class that takes a connection in it's constructor:
+class that takes a connection in it's constructor::
 
   class EchoServer:
 
       def __init__(self, connection):
-          connection.setHandler(self)
+          connection.set_handler(self)
 
       def handle_input(self, connection, data):
           connection.write(data.upper())
@@ -236,57 +239,20 @@ class that takes a connection in it's constructor:
 Remember a server is just a callable that takes a connection and
 sets its handler.
 
-Testing servers
----------------
+Testing listeners
+-----------------
 
-When testing servers, we'll often use the
-``zc.ngi.testing.listener`` function::
+The testing implementation provides a ``listener`` function::
 
-    >>> listener = zc.ngi.testing.listener(address, EchoServer)
+    >>> listener = zc.ngi.testing.listener('addr', EchoServer)
 
-Generally, the address will either be a host/port tuple or the name of
-a Unix domain socket, although an implementation may define a custom
-address representation.  The ``zc.ngi.testing.listener`` function will
-take any hashable address object.
+This is primarily useful when you want to connect client and server
+handlers, as we'll discuss later.  The address passed to the
+testing listener function can be any hashable object.
 
-We can connect to a *testing* listener using its connect method::
-
-    >>> connection = listener.connect()
-
-The connection returned from ``listener.connect`` is not the connection
-passed to the server.  Instead, it's a test connection that we can use
-as if we're writing a client::
-
-    >>> connection.write('Hi\nthere.')
-    -> 'HI\nTHERE.'
-
-It is actually a peer of the connection passed to the server. Testing
-connections have peer attributes that you can use to get to the peer
-connection::
-
-    >>> connection.peer.peer is connection
-    True
-    >>> list(listener.connections()) == [connection.peer]
-    True
-
-The test connection has a default handler that just prints data to
-standard output, but we can call ``setHandler`` on it to use a different
-handler::
-
-    >>> class Handler:
-    ...     def handle_input(self, connection, data):
-    ...         print 'got', `data`
-    >>> connection.setHandler(Handler())
-    >>> connection.write('take this')
-    got 'TAKE THIS'
-
-Now, the data sent back from the server is handled by our custom
-handler, rather than the default one.
-
-.. cleanup
-
-    >>> listener.close()
-    closed stopped
+Creating a testing listener causes it to be registered in a mapping
+so it can be connected to later.  For this reason, it's important to
+close any listeners created in tests.
 
 Listener objects
 ----------------
@@ -302,13 +268,11 @@ We can stop listening by calling a listener's close method::
 
     >>> listener.close()
 
-
 .. XXX Future
 
   There's also a ``close_wait`` method that stops listening and waits
   for a given period of time for clients to finish on their own before
   closing them.
-
 
 Threading
 =========
@@ -324,7 +288,7 @@ thread-safety requirements.
   ``close`` are  thread safe. They may be called at
   any time by any thread.
 
-  The connection setHandler method must only be called in a connect
+  The connection set_handler method must only be called in a connect
   handler's ``connected`` method or a connection handler's
   ``handle_input`` method.
 
@@ -335,6 +299,10 @@ thread-safety requirements.
 - Application handler methods need not be thread safe.  NGI
   implementations will never call them from more than one thread at a
   time.
+
+- Handlers block implementations When an implementatuon calls a
+  handler, it is blocked from handling other network events until the
+  handler returns.
 
 ``zc.ngi.async`` implementations and threading
 ----------------------------------------------
@@ -385,14 +353,18 @@ Multiple ``zc.ngi.async`` implementations and application-managed threads
     are no handlers registered with the implementation.
     ``zc.ngi.async.main`` is a ``zc.ngi.async.Inline`` instance.
 
+An advantage of the application-managed loop options is that
+exceptions raised by handlers are propagated to the application. When
+an implementation manages a loop thread, it logs exceptions.
+
 Performance issues with a single loop
 -------------------------------------
 
 With a single loop, all networking activity is done in one thread.
-If a handler takes a long time to perform some function, it can
-prevent other networking activity from proceeding. For this reason,
+If a handler takes a long time to perform some function, it
+prevents other networking activity from proceeding. For this reason,
 when a single loop is used, it's important that handlers perform their
-work quickly, without blocking for any length of time.
+work quickly, without blocking for any significant length of time.
 
 If a loop is only servicing a single handler, or a small number of
 handlers, it's not a problem if a handler takes along time to respond
@@ -538,7 +510,7 @@ Implementing clients
 ====================
 
 Implementing clients is a little bit more involved than implementing
-servers because in addition to handling connections, you have to
+servers because, in addition to handling connections, you have to
 initiate the connections in the first place.  This involves
 implementing client connect handlers.  You request a connection by
 calling an implementation's ``connect`` function, passing an address
@@ -555,7 +527,7 @@ word-count server to get its line and word counts::
           self.data = data
 
       def connected(self, connection):
-          connection.setHandler(LineReader())
+          connection.set_handler(LineReader())
           connection.write(self.data)
 
       def failed_connect(self, reason):
@@ -601,6 +573,18 @@ we need to get the test connection's peer and call its write method::
     <BLANKLINE>
     -> CLOSE
 
+Testing connections are always created in pairs. Each connection in
+the pair is the other's peer::
+
+    >>> connection.peer.peer is connection
+    True
+
+When a connection is created directly, it's peer has a simple printing
+handler, which is why, when we write to the connection, the text we
+write is written out with a marker.  When we create a connection by
+connecting to a listener, the connections's peer's handler is the
+server used to create the listener.
+
 Combining connect handlers with connection handlers
 ---------------------------------------------------
 
@@ -612,7 +596,7 @@ A connect handler can be its own connection handler::
           self.data = data
 
       def connected(self, connection):
-          connection.setHandler(self)
+          connection.set_handler(self)
           connection.write("%s\n%s" % (len(self.data), self.data))
 
       def failed_connect(self, reason):
@@ -764,7 +748,7 @@ to stay connected::
             self.connector(self.address, self)
 
         def connected(self, connection):
-            connection.setHandler(self)
+            connection.set_handler(self)
 
         def failed_connect(self, reason):
             print 'failed connect', reason
@@ -781,7 +765,7 @@ to stay connected::
 
     >>> exec(src)
 
-To try this out, we'll create a trivial connector that just remembers
+To try this out, we'll create a trivial connector that just notes
 the attempt::
 
     def connector(addr, handler):
@@ -865,13 +849,13 @@ deals with the handling of sized messages for the word-count example::
             self.write = connection.write
             self.writelines = connection.writelines
 
-        def setHandler(self, handler):
+        def set_handler(self, handler):
             self.handler = handler
             if hasattr(handler, 'handle_close'):
                 self.handle_close = handler.handle_close
             if hasattr(handler, 'handle_exception'):
                 self.handle_exception = handler.handle_exception
-            self.connection.setHandler(self)
+            self.connection.set_handler(self)
 
         def handle_input(self, connection, data):
             self.input += data
@@ -891,17 +875,17 @@ deals with the handling of sized messages for the word-count example::
     >>> exec(src)
 
 With this adapter, we can now write a much simpler version of the
-word-count server:
+word-count server::
 
   class WCAdapted:
 
       def __init__(self, connection):
-          Sized(connection).setHandler(self)
+          Sized(connection).set_handler(self)
 
       def handle_input(self, connection, data):
           connection.write(
-              '%d %d\n' % (len(data.split('\n')), len(data.split())))
-
+              '%d %d\n' % (len(data.split('\n')),
+                           len(data.split())))
 
 .. -> src
 
@@ -925,7 +909,8 @@ of the word count server using an adapter::
         while 1:
             data = (yield)
             connection.write(
-                '%d %d\n' % (len(data.split('\n')), len(data.split())))
+                '%d %d\n' % (len(data.split('\n')),
+                             len(data.split())))
 
 .. -> src
 
