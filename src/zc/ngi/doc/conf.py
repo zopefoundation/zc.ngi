@@ -14,7 +14,7 @@
 # General information about the project.
 project = u'zc.ngi'
 copyright = u'2009, Jim Fulton'
-version = '1.1'
+version = '2.0'
 
 import sys, os
 
