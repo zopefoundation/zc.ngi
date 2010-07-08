@@ -304,6 +304,8 @@ thread-safety requirements.
   handler, it is blocked from handling other network events until the
   handler returns.
 
+.. _async_threads:
+
 ``zc.ngi.async`` implementations and threading
 ----------------------------------------------
 

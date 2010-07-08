@@ -99,7 +99,7 @@ hashable object may be used as an address.
       connection = zc.ngi.testing.Connection()
 
    My default, test connections have handlers that write data to
-   standard output.  You can change their handlers using setHandler.
+   standard output.  You can change their handlers using set_handler.
 
    .. attribute:: peer
 
@@ -135,17 +135,5 @@ resulting address can be obtained using the :attr:`address
 <zc.ngi.interfaces.IListener.address>` attribute. This is mainly
 useful for testing,
 
-The async implementation manages thread for performing network IO.
-This thread is started implicitly when an :class:`implementation
-<zc.ngi.interfaces.IImplementation>` method is called.  It may be
-started explicitly using the :func:`start_thread` function.
-
-.. function:: start_thread(daemon=True)
-
-   If the async thread hasn't started yet, then start the thread using
-   the given daemon mode.
-
-   For long-running applications, such as servers, using a
-   non-daemonic thread will keep the process going even after the main
-   thread completes, freeing the application programmer from needing
-   to maintain the main thread.
+The ``zc.ngi.async`` modules provides a number of threading modes. See
+:ref:`async_threads`.

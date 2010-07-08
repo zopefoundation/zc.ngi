@@ -124,7 +124,7 @@ we'll use the blocking interface:
     >>> event = threading.Event()
     >>> class LameClientConnectionHandler:
     ...     def connected(self, connection):
-    ...         connection.setHandler(self)
+    ...         connection.set_handler(self)
     ...         raise ValueError('Broken connector')
     ...     def handle_close(self, conection, reason):
     ...         self.closed = reason
@@ -147,7 +147,7 @@ we'll use the blocking interface:
 
     >>> class LameClientConnectionHandler:
     ...     def connected(self, connection):
-    ...         connection.setHandler(self)
+    ...         connection.set_handler(self)
     ...         connection.write('foo\0')
     ...
     ...     def handle_input(self, data):

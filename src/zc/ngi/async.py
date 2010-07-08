@@ -23,6 +23,7 @@ import socket
 import sys
 import threading
 import time
+import warnings
 import zc.ngi
 import zc.ngi.interfaces
 
@@ -225,7 +226,7 @@ class _Connection(dispatcher):
     def __nonzero__(self):
         return self.__connected
 
-    def setHandler(self, handler):
+    def set_handler(self, handler):
         if self.__handler is not None:
             raise TypeError("Handler already set")
 
@@ -246,6 +247,11 @@ class _Connection(dispatcher):
                 self.logger.exception("Exception raised by handle_close(%r)",
                                       self.__closed)
                 raise
+
+    def setHandler(self, handler):
+        warnings.warn("setHandler is deprecated. Use set_handler,",
+                      DeprecationWarning, stacklevel=2)
+        self.set_handler(handler)
 
     def write(self, data):
         if __debug__:
@@ -366,6 +372,9 @@ class _Connection(dispatcher):
 
     def handle_expt(self):
         self.handle_close('socket error')
+
+    def __hash__(self):
+        return hash(self.socket)
 
 
 class _ServerConnection(_Connection):
@@ -632,7 +641,7 @@ class _UDPListener(BaseListener):
         self.implementation.notify_select()
 
     def handle_read(self):
-        message, addr = self.recvfrom(self.__buffer_size)
+        message, addr = self.socket.recvfrom(self.__buffer_size)
         self.__handler(addr, message)
 
     def close(self):
@@ -676,7 +685,7 @@ if os.name == 'posix':
             r, self.__writefd = os.pipe()
             asyncore.file_dispatcher.__init__(self, r, map)
 
-            if self.fd != r:
+            if self.socket.fd != r:
                 # Starting in Python 2.6, the descriptor passed to
                 # file_dispatcher gets duped and assigned to
                 # self.fd. This breaks the instantiation semantics and

@@ -32,12 +32,12 @@ class IImplementation(Interface):
     def connect(address, handler):
         """Try to make a connection to the given address
 
-        The handler is an IClientConnectHandler.  The handler
-        connected method will be called with an IConnection object
-        if and when the connection succeeds or failed_connect method
+        The handler is an ``IClientConnectHandler``.  The handler
+        ``connected`` method will be called with an ``IConnection`` object
+        if and when the connection succeeds or ``failed_connect`` method
         will be called if the connection fails.
 
-        This method os thread safe. It may be called by any thread at
+        This method is thread safe. It may be called by any thread at
         any time.
         """
 
@@ -46,9 +46,9 @@ class IImplementation(Interface):
 
         When a connection is received, call the handler.
 
-        An IListener object is returned.
+        An ``IListener`` object is returned.
 
-        This method os thread safe. It may be called by any thread at
+        This method is thread safe. It may be called by any thread at
         any time.
         """
 
@@ -64,9 +64,9 @@ class IImplementation(Interface):
 
         When a message is received, call the handler with the message.
 
-        An IUDPListener object is returned.
+        An ``IUDPListener`` object is returned.
 
-        This method os thread safe. It may be called by any thread at
+        This method is thread safe. It may be called by any thread at
         any time.
         """
 
@@ -87,16 +87,18 @@ class IConnection(Interface):
         False otherwise.
         """
 
-    def setHandler(handler):
-        """Set the IConnectionHandler for a connection.
+    def set_handler(handler):
+        """Set the ``IConnectionHandler`` for a connection.
 
-        This method can only be called in direct response to an
-        implementation call to a IConnectionHandler,
-        IClientConnectHandler, or IServer.
+        This method may be called multiple times, but it should only
+        be called in direct response to an implementation call to a
+        ``IConnectionHandler``, ``IClientConnectHandler``, or
+        ``IServer``.
 
         Any failure of a handler call must be caught and logged.  If
-        an exception is raised by a call to hande_input or
-        handle_exception, the connection must be closed.
+        an exception is raised by a call to ``hande_input`` or
+        ``handle_exception``, the connection must be closed by the
+        implementation.
         """
 
     def write(data):
@@ -104,24 +106,24 @@ class IConnection(Interface):
 
         The write call is non-blocking.
 
-        This method os thread safe. It may be called by any thread at
+        This method is thread safe. It may be called by any thread at
         any time.
         """
 
     def writelines(data):
         """Output an iterable of strings to the connection.
 
-        The writelines call is non-blocking. Note, that the data may
+        The ``writelines`` call is non-blocking. Note, that the data may
         not have been consumed when the method returns.
 
-        This method os thread safe. It may be called by any thread at
+        This method is thread safe. It may be called by any thread at
         any time.
         """
 
     def close():
         """Close the connection
 
-        This method os thread safe. It may be called by any thread at
+        This method is thread safe. It may be called by any thread at
         any time.
         """
 
@@ -173,9 +175,9 @@ class IConnectionHandler(Interface):
         """Recieve a report of an exception encountered by a connection
 
         This method is used to recieve exceptions from an NGI
-        implementation.  Typically, this will be due to an error
-        encounted processing data passed to the connection write or
-        writelines methods.
+        implementation.  This will only be due to an error
+        encounted processing data passed to the connection
+        ``writelines`` methods.
         """
 
 class IClientConnectHandler(Interface):
@@ -200,6 +202,9 @@ class IServer(Interface):
     """Handle server connections
 
     This is an application interface.
+
+    A server is just a callable that takes a connection and set's it's
+    handler.
     """
 
     def __call__(connection):
@@ -211,6 +216,9 @@ class IUDPHandler(Interface):
     """Handle udp messages
 
     This is an application interface.
+
+    A UDP handler is a callable that takes a client address and an
+    8-bit string message.
     """
 
     def __call__(addr, data):

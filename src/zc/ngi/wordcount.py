@@ -43,7 +43,7 @@ class Server:
         if __debug__:
             logger.debug("Server(%r)", connection)
         self.input = ''
-        connection.setHandler(self)
+        connection.set_handler(self)
 
     def handle_input(self, connection, data):
         if __debug__:
@@ -182,7 +182,7 @@ class Client:
         if __debug__:
             logger.debug("connected(%r)", connection)
         connection.write(self.docs[0]+'\0')
-        connection.setHandler(self)
+        connection.set_handler(self)
 
     def failed_connect(self, reason):
         print 'Failed to connect:', reason

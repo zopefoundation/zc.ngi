@@ -86,7 +86,7 @@ that the server properly echoes data sent do it.
     ...         for s in self.strings:
     ...             connection.write(s + '\n')
     ...         self.input = ''
-    ...         connection.setHandler(self)
+    ...         connection.set_handler(self)
     ...
     ...     def failed_connect(self, reason):
     ...         print 'failed connect:', reason
@@ -209,7 +209,7 @@ handle_exception:
     >>> def bad():
     ...     yield 2
     >>> connection = zc.ngi.testing.Connection()
-    >>> connection.setHandler(zc.ngi.testing.PrintingHandler(connection))
+    >>> connection.set_handler(zc.ngi.testing.PrintingHandler(connection))
     >>> connection.writelines(bad())
     -> EXCEPTION TypeError Got a non-string result from iterable
 
@@ -227,7 +227,7 @@ implement a simple echo server:
     ...     def __init__(self, connection):
     ...         print 'server connected'
     ...         self.input = ''
-    ...         connection.setHandler(self)
+    ...         connection.set_handler(self)
     ...
     ...     def handle_input(self, connection, data):
     ...         print 'server got input:', repr(data)

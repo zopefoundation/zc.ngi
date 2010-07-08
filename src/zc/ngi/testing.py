@@ -16,6 +16,7 @@
 
 import sys
 import traceback
+import warnings
 import zc.ngi
 import zc.ngi.interfaces
 
@@ -24,7 +25,7 @@ zc.ngi.interfaces.moduleProvides(zc.ngi.interfaces.IImplementation)
 class PrintingHandler:
 
     def __init__(self, connection):
-        connection.setHandler(self)
+        connection.set_handler(self)
 
     def handle_input(self, connection, data):
         data = repr(data)
@@ -108,7 +109,7 @@ class Connection:
             raise TypeError("Connection closed")
         self.write = write
 
-    def setHandler(self, handler):
+    def set_handler(self, handler):
         self.handler = handler
         if self.exception:
             exception = self.exception
@@ -122,6 +123,11 @@ class Connection:
         # don't want to call handle_close.
         if self.closed and isinstance(self.closed, str):
             self._callHandler('handle_close', self.closed)
+
+    def setHandler(self, handler):
+        warnings.warn("setHandler is deprecated. Use set_handler,",
+                      DeprecationWarning, stacklevel=2)
+        self.set_handler(handler)
 
     def test_input(self, data):
         if self.handler is not None:

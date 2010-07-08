@@ -11,6 +11,8 @@
 # FOR A PARTICULAR PURPOSE.
 #
 ##############################################################################
+from __future__ import with_statement
+
 import doctest
 import logging
 import manuel.capture
@@ -26,12 +28,25 @@ import zc.ngi.generator
 import zc.ngi.testing
 import zc.ngi.wordcount
 
+def blocking_warns():
+    """
+    >>> assert_(len(blocking_warnings) == 1)
+    >>> assert_(blocking_warnings[-1].category is DeprecationWarning)
+    >>> print blocking_warnings[-1].message
+    The blocking module is deprecated.
+    """
+
 if sys.version_info >= (2, 6):
     # silence blocking deprecation warning
-    with warnings.catch_warnings(record=True):
+    with warnings.catch_warnings(record=True) as blocking_warnings:
+        warnings.simplefilter('default')
         # omg, without record=True, warnings aren't actually caught.
         # Who thinks up this stuff?
         import zc.ngi.blocking
+else:
+    del blocking_warns
+
+
 
 def test_async_cannot_connect():
     """Let's make sure that the connector handles connection failures correctly
@@ -378,6 +393,7 @@ The testing connection warns:
 
     >>> conn = zc.ngi.testing.Connection()
     >>> with warnings.catch_warnings(record=True) as caught:
+    ...     warnings.simplefilter('default')
     ...     conn.setHandler(Handler())
     ...     assert_(len(caught) == 1, len(caught))
     ...     assert_(caught[-1].category is DeprecationWarning)
@@ -394,6 +410,7 @@ The async connections warn:
     ...     def __init__(self, c):
     ...         global server_caught
     ...         with warnings.catch_warnings(record=True) as caught:
+    ...             warnings.simplefilter('default')
     ...             c.setHandler(self)
     ...             server_caught = caught
     ...         server_event.set()
@@ -405,6 +422,7 @@ The async connections warn:
     ...     def connected(self, c):
     ...         global client_caught
     ...         with warnings.catch_warnings(record=True) as caught:
+    ...             warnings.simplefilter('default')
     ...             c.setHandler(self)
     ...             client_caught = caught
     ...         client_event.set()
@@ -432,6 +450,7 @@ The adapters warn:
 
     >>> import zc.ngi.adapters
     >>> with warnings.catch_warnings(record=True) as caught:
+    ...     warnings.simplefilter('default')
     ...     conn = zc.ngi.adapters.Lines(zc.ngi.testing.Connection())
     ...     conn.setHandler(Handler())
     ...     assert_(len(caught) == 1)
@@ -446,6 +465,7 @@ The adapters warn:
     ...         old_handler = h
 
     >>> with warnings.catch_warnings(record=True) as caught:
+    ...     warnings.simplefilter('default')
     ...     conn = zc.ngi.adapters.Lines(OldConn())
     ...     handler = Handler()
     ...     conn.set_handler(handler)

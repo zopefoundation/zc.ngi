@@ -14,6 +14,7 @@
 """NGI connection adapters
 """
 import struct
+import warnings
 import zc.ngi.generator
 
 class Base(object):
@@ -32,9 +33,19 @@ class Base(object):
         self.writelines = self.connection.writelines
         self.writelines(data)
 
-    def setHandler(self, handler):
+    def set_handler(self, handler):
         self.handler = handler
-        self.connection.setHandler(self)
+        try:
+            self.connection.set_handler(self)
+        except AttributeError:
+            self.connection.setHandler(self)
+            warnings.warn("setHandler is deprecated. Use set_handler,",
+                          DeprecationWarning, stacklevel=2)
+
+    def setHandler(self, handler):
+        warnings.warn("setHandler is deprecated. Use set_handler,",
+                      DeprecationWarning, stacklevel=2)
+        self.set_handler(handler)
 
     def handle_input(self, connection, data):
         handle_input = self.handler.handle_input
@@ -67,9 +78,10 @@ class Sized(Base):
     want = 4
     got = 0
     getting_size = True
-    def setHandler(self, handler):
+
+    def set_handler(self, handler):
         self.input = []
-        Base.setHandler(self, handler)
+        Base.set_handler(self, handler)
 
     def handle_input(self, connection, data):
         self.got += len(data)

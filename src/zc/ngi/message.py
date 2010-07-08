@@ -12,11 +12,10 @@
 #
 ##############################################################################
 """Sample client that sends a single message and waits for a reply
-
-$Id$
 """
 
 import threading
+import warnings
 
 class CouldNotConnect(Exception):
     """Could not connect to a server
@@ -35,7 +34,7 @@ class Message:
         self.input = ''
 
     def connected(self, connection):
-        connection.setHandler(self)
+        connection.set_handler(self)
         connection.write(self.message)
 
     def failed_connect(self, reason):

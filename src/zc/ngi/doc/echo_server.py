@@ -15,7 +15,7 @@ class Echo:
         print 'oops', exception
 
 def echo_server(connection):
-    connection.setHandler(Echo())
+    connection.set_handler(Echo())
 
 def main(args=None):
     if args is None:

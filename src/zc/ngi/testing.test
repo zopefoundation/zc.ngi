@@ -11,7 +11,7 @@ simple example:
     ...         self.state = 'i'
     ...         self.who = who
     ...         self.connection = connection
-    ...         connection.setHandler(self)
+    ...         connection.set_handler(self)
     ...
     ...     def handle_input(self, connection, data):
     ...         print self.who, self.state, 'got:', data

@@ -11,6 +11,7 @@
 # FOR A PARTICULAR PURPOSE.
 #
 ##############################################################################
+import warnings
 import zc.ngi.interfaces
 
 def handler(func=None, connection_adapter=None):
@@ -47,7 +48,8 @@ class Handler(object):
                 ConnectionHandler(self.func(inst, connection), connection)
                 )
 
-    connected = __call__
+    def connected(self, connection):
+        self(connection)
 
     def failed_connect(self, reason):
         raise zc.ngi.interfaces.ConnectionFailed(reason)
@@ -62,7 +64,12 @@ class ConnectionHandler(object):
             return
 
         self.gen = gen
-        connection.setHandler(self)
+        try:
+            connection.set_handler(self)
+        except AttributeError:
+            self.connection.setHandler(self)
+            warnings.warn("setHandler is deprecated. Use set_handler,",
+                          DeprecationWarning, stacklevel=2)
 
     def handle_input(self, connection, data):
         try:

@@ -15,7 +15,12 @@ from zc.ngi.interfaces import ConnectionFailed
 import sys
 import threading
 import time
+import warnings
 import zc.ngi
+import zc.ngi.adapters
+
+warnings.warn("The blocking module is deprecated.",
+              DeprecationWarning, stacklevel=2)
 
 class Timeout(Exception):
     """An operation timed out.
@@ -25,28 +30,16 @@ class ConnectionTimeout(Timeout, ConnectionFailed):
     """An attempt to connect timed out.
     """
 
-class RequestConnection:
+class RequestConnection(zc.ngi.adapters.Base):
 
     def __init__(self, connection, connector):
         self.connection = connection
         self.connector = connector
 
-    def write(self, data):
-        self.write = self.connection.write
-        self.write(data)
-
-    def writelines(self, data):
-        self.writelines = self.connection.writelines
-        self.writelines(data)
-
     def close(self):
         self.connector.closed = True
         self.connection.close()
         self.connector.event.set()
-
-    def setHandler(self, handler):
-        self.handler = handler
-        self.connection.setHandler(self)
 
     def handle_input(self, connection, data):
         try:
@@ -82,7 +75,6 @@ class RequestConnection:
                 raise
         return handle_exception
 
-
 class RequestConnector:
 
     exception = closed = connection = result = None
@@ -96,7 +88,7 @@ class RequestConnector:
             elif getattr(handler, 'handle_input', None) is None:
                 raise
             else:
-                connected = lambda connection: connection.setHandler(handler)
+                connected = lambda connection: connection.set_handler(handler)
 
         self._connected = connected
         self.event = event
@@ -163,7 +155,9 @@ class _connector:
         self.event.set()
 
 def open(connection_or_address, connector=None, timeout=None):
-    if connector is None and hasattr(connection_or_address, 'setHandler'):
+    if connector is None and (hasattr(connection_or_address, 'set_handler')
+                              or hasattr(connection_or_address, 'setHandler')
+                              ):
         # connection_or_address is a connection
         connection = connection_or_address
     else:
@@ -271,7 +265,7 @@ class InputFile(_BaseFile):
         self._data = ''
         self._outputfile = outputfile
         self._outputfile._exception = None
-        connection.setHandler(self)
+        connection.set_handler(self)
 
     def invalid_method(*args, **kw):
         raise IOError("Invalid operation on output file")

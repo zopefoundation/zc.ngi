@@ -19,9 +19,9 @@ To learn more, see http://packages.python.org/zc.ngi/
 Changes
 *******
 
-==================
-1.2.0 (2010-07-??)
-==================
+====================
+2.0.0a1 (2010-07-??)
+====================
 
 New Features:
 
@@ -39,6 +39,8 @@ New Features:
   separate threads. This is useful in applications with fewer network
   connections and with handlers that tend to perform long-lating
   computations that would be unacceptable with a single select loop.
+
+- Renamed IConnection.setHandler to set_handler.
 
 - Dropped support for Python 2.4.
 

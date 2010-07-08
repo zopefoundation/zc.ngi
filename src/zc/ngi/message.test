@@ -10,7 +10,7 @@ server:
     ...
     ...     def __init__(self, connection):
     ...         self.input = ''
-    ...         connection.setHandler(self)
+    ...         connection.set_handler(self)
     ...
     ...     def handle_input(self, connection, data):
     ...         self.input += data
