@@ -479,6 +479,80 @@ The adapters warn:
 
     """
 
+def EXPERIMENTAL_thready_async_servers():
+    r"""
+    When creating a listener with a zc.ngi.async.Implementation, you can
+    pass a thready keyword options to cause each client to get it's own thread.
+
+    >>> import functools, threading, zc.ngi.generator
+
+    >>> @functools.partial(zc.ngi.async.listener, None, thready=True)
+    ... @zc.ngi.generator.handler
+    ... def listener(conn):
+    ...     if 'client' not in threading.current_thread().name:
+    ...         print 'oops'
+    ...     yield
+    >>> addr = listener.address
+
+    So, now we're listening on listener.address, let's connect to it.
+
+    >>> event = threading.Event()
+    >>> class Connect:
+    ...     def __init__(self, name):
+    ...         self.name = name
+    ...         event.clear()
+    ...         zc.ngi.async.connect(addr, self)
+    ...         event.wait(1)
+    ...     def connected(self, connection):
+    ...         globals()[self.name] = connection
+    ...         zc.ngi.testing.PrintingHandler(connection)
+    ...         event.set()
+
+    Initially, we have no client handling threads:
+
+    >>> def count_client_threads():
+    ...     return len([t for t in threading.enumerate()
+    ...                 if ("%r client" % (addr, )) in t.name])
+    >>> count_client_threads()
+    0
+
+    >>> _ = Connect('c1')
+    >>> _ = Connect('c2')
+
+    So now we have 2 connections and we have 2 corresponding threads:
+
+    >>> count_client_threads()
+    2
+
+    If we close the connections and wait a bit, the threads will be cleaned up:
+
+    >>> c1.close()
+    >>> c2.close()
+    >>> time.sleep(.1)
+
+    >>> count_client_threads()
+    0
+
+    Let's create another connection
+
+    >>> _ = Connect('c1')
+    >>> count_client_threads()
+    1
+
+    Now, we'll close the listener and the connection threads will be cleaned up.
+
+    >>> listener.close()
+    >>> time.sleep(.5)
+    -> CLOSE end of input
+
+    >>> count_client_threads()
+    0
+
+    >>> zc.ngi.async.wait(1)
+
+    """
+
+
 if sys.version_info < (2, 6):
     del setHandler_compatibility
 

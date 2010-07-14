@@ -21,6 +21,7 @@ import logging
 import os
 import socket
 import sys
+import thread
 import threading
 import time
 import warnings
@@ -57,7 +58,11 @@ class Implementation:
         self._callbacks = []
         self._start_lock = threading.Lock()
 
+    thread_ident = None
     def call_from_thread(self, func):
+        if thread.get_ident() == self.thread_ident:
+            func()
+            return
         self._callbacks.append(func)
         self.notify_select()
         self.start_thread()
@@ -69,8 +74,8 @@ class Implementation:
         self.call_from_thread(lambda : _Connector(addr, handler, self))
         self.start_thread()
 
-    def listener(self, addr, handler):
-        result = _Listener(addr, handler, self)
+    def listener(self, addr, handler, thready=False):
+        result = _Listener(addr, handler, self, thready)
         self.start_thread()
         return result
 
@@ -93,7 +98,7 @@ class Implementation:
         return result
 
     _thread = None
-    def start_thread(self, daemon=True):
+    def start_thread(self):
         with self._start_lock:
             if self._thread is None:
                 self._thread = threading.Thread(
@@ -111,6 +116,7 @@ class Implementation:
             raise zc.ngi.interfaces.Timeout
 
     def loop(self, timeout=None):
+        self.thread_ident = thread.get_ident()
         if timeout is not None:
             deadline = time.time() + timeout
         else:
@@ -156,6 +162,7 @@ class Implementation:
                 if timeout <= 0:
                     raise zc.ngi.interfaces.Timeout
         finally:
+            del self.thread_ident
             del self.notify_select
             trigger.close()
 
@@ -380,9 +387,9 @@ class _Connection(dispatcher):
 class _ServerConnection(_Connection):
     zc.ngi.interfaces.implements(zc.ngi.interfaces.IServerConnection)
 
-    def __init__(self, sock, addr, logger, listener):
+    def __init__(self, sock, addr, logger, listener, implementation):
         self.control = listener
-        _Connection.__init__(self, sock, addr, logger, listener.implementation)
+        _Connection.__init__(self, sock, addr, logger, implementation)
 
     def close(self):
         _Connection.close(self)
@@ -503,8 +510,7 @@ class BaseListener(asyncore.dispatcher):
 
     def handle_error(self):
         reason = sys.exc_info()[1]
-        #self.logger.exception('listener error')
-        traceback.print_exception(*sys.exc_info())
+        self.logger.exception('listener error')
         self.close()
         self.implementation.handle_error()
 
@@ -513,10 +519,11 @@ class _Listener(BaseListener):
 
     logger = logging.getLogger('zc.ngi.async.server')
 
-    def __init__(self, addr, handler, implementation):
+    def __init__(self, addr, handler, implementation, thready):
         self.__handler = handler
         self.__close_handler = None
-        self.__connections = {}
+        self._thready = thready
+        self.__connections = set()
         BaseListener.__init__(self, implementation)
         if isinstance(addr, str):
             family = socket.AF_UNIX
@@ -574,20 +581,31 @@ class _Listener(BaseListener):
         if __debug__:
             self.logger.debug('incoming connection %r', addr)
 
-        connection = _ServerConnection(sock, addr, self.logger, self)
-        self.__connections[connection] = 1
-        try:
-            self.__handler(connection)
-        except:
-            self.logger.exception("server handler failed")
-            self.close()
+        if self._thready:
+            impl = Implementation(name="%r client" % (self.address,))
+        else:
+            impl = self.implementation
+        connection = _ServerConnection(sock, addr, self.logger, self, impl)
+        self.__connections.add(connection)
+
+        @impl.call_from_thread
+        def _():
+            try:
+                self.__handler(connection)
+            except:
+                self.logger.exception("server handler failed")
+                self.close()
+
+        if impl is not self.implementation:
+            impl.start_thread()
+
 
     def connections(self):
         return iter(self.__connections)
 
     def closed(self, connection):
         if connection in self.__connections:
-            del self.__connections[connection]
+            self.__connections.remove(connection)
             if not self.__connections and self.__close_handler:
                 self.__close_handler(self)
 
