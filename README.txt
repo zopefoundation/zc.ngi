@@ -20,13 +20,21 @@ Changes
 *******
 
 ====================
-2.0.0a2 (2010-07-??)
+2.0.0a2 (2010-07-22)
 ====================
 
 New Features:
 
 - There's a new experimental zc.ngi.async.Implementation.listener
   option to run each client (server connection) in it's own thread.
+
+  (It's not documented. It's experimental, but there is a doctest.)
+
+Bugs Fixed:
+
+- There was a bug in handling connecting to testing servers that
+  caused printing handlers to be used when they shouldn't have been.
+
 
 ====================
 2.0.0a1 (2010-07-08)

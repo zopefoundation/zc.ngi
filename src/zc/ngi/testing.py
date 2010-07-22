@@ -187,7 +187,7 @@ def connect(addr, handler):
         if connections:
             return handler.connected(connections.pop(0))
     elif isinstance(connections, listener):
-        return handler.connected(connections.connect())
+        return connections.connect(addr, handler=handler)
     elif connections is _recursing:
         print (
             "For address, %r, a connect handler called connect from a\n"

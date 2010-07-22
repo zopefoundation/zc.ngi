@@ -552,6 +552,30 @@ def EXPERIMENTAL_thready_async_servers():
 
     """
 
+def connect_to_a_testing_listener_shoulnt_use_printing_handler():
+    r"""
+If we use zc.ngi.testing.connect to connect to a registered listener,
+the printing handler shoudn't be used.
+
+    >>> import zc.ngi.testing, zc.ngi.adapters
+    >>> @zc.ngi.adapters.Lines.handler
+    ... def echo(connection):
+    ...     while 1:
+    ...         connection.write((yield).upper())
+
+    >>> listener = zc.ngi.testing.listener('a', echo)
+
+    >>> @zc.ngi.adapters.Lines.handler
+    ... def client(connection):
+    ...     connection.write('test\n')
+    ...     response = (yield)
+    ...     print 'client got', response
+
+    >>> zc.ngi.testing.connect('a', client)
+
+    >>> listener.close()
+    """
+
 
 if sys.version_info < (2, 6):
     del setHandler_compatibility
