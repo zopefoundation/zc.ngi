@@ -561,7 +561,7 @@ the printing handler shoudn't be used.
     >>> @zc.ngi.adapters.Lines.handler
     ... def echo(connection):
     ...     while 1:
-    ...         connection.write((yield).upper())
+    ...         connection.write((yield).upper()+'\n')
 
     >>> listener = zc.ngi.testing.listener('a', echo)
 
@@ -572,6 +572,7 @@ the printing handler shoudn't be used.
     ...     print 'client got', response
 
     >>> zc.ngi.testing.connect('a', client)
+    client got TEST
 
     >>> listener.close()
     """
