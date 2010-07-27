@@ -20,6 +20,16 @@ Changes
 *******
 
 ====================
+2.0.0a4 (2010-07-27)
+====================
+
+Bugs Fixed:
+
+- When using zc.ngi.testing and a server sent input and closed a
+  connection before set_handler was called on the client, the input
+  sent by the server was lost.
+
+====================
 2.0.0a3 (2010-07-22)
 ====================
 

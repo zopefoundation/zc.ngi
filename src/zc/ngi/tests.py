@@ -23,6 +23,7 @@ import threading
 import time
 import unittest
 import warnings
+import zc.ngi.adapters
 import zc.ngi.async
 import zc.ngi.generator
 import zc.ngi.testing
@@ -576,6 +577,28 @@ the printing handler shoudn't be used.
 
     >>> listener.close()
     """
+
+def testing_connection_processes_close_and_input_before_set_handler_in_order():
+    r"""
+If we are using test connections and the server sends input and closes
+the connection before the client handler is set, the client must see the input:
+
+    >>> @zc.ngi.adapters.Lines.handler
+    ... def server(c):
+    ...     c.write((yield).upper()+'\n')
+
+    >>> listener = zc.ngi.testing.listener('x', server)
+
+    >>> @zc.ngi.adapters.Lines.handler
+    ... def client(c):
+    ...     c.write('test\n')
+    ...     print (yield)
+
+    >>> zc.ngi.testing.connect('x', client)
+    TEST
+
+    >>> listener.close()
+"""
 
 
 if sys.version_info < (2, 6):

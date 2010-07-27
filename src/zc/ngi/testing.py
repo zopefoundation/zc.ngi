@@ -50,10 +50,9 @@ class Connection:
 
     def __init__(self, peer=None, handler=PrintingHandler):
         self.handler = None
-        self.closed = False
-        self.input = ''
-        self.exception = None
+        self.handler_queue = []
         self.control = None
+        self.closed = None
         if peer is None:
             peer = Connection(self)
             handler(peer)
@@ -63,12 +62,26 @@ class Connection:
         return not self.closed
 
     queue = None
-    def _callHandler(self, method, *args):
+    def _callHandler(self, method, arg):
+        if self.handler is None:
+            queue = self.handler_queue
+            if (method == 'handle_input' and queue and queue[-1][0] == method):
+                # combine inputs
+                queue[-1] = method, queue[-1][1]+arg
+            else:
+                queue.append((method, arg))
+            return
+
         if self.queue is None:
-            self.queue = [(method, args)]
-            while self.queue:
-                method, args = self.queue.pop(0)
-                if self.closed and method != 'handle_close':
+            self.queue = queue = [(method, arg)]
+            while queue:
+                method, arg = queue.pop(0)
+
+                if method == 'handle_close':
+                    if self.control is not None:
+                        self.control.closed(self)
+                    self.closed = arg
+                elif self.closed:
                     break
 
                 try:
@@ -84,11 +97,11 @@ class Connection:
                                               None)
                             if handler is None:
                                 return
-                            args = self, 'unhandled exception'
+                            arg = 'unhandled exception'
                         else:
                             raise
 
-                    handler(self, *args)
+                    handler(self, arg)
                 except:
                     print "Error test connection calling connection handler:"
                     traceback.print_exc(file=sys.stdout)
@@ -98,7 +111,7 @@ class Connection:
 
             self.queue = None
         else:
-            self.queue.append((method, args))
+            self.queue.append((method, arg))
 
     def close(self):
         self.peer.test_close('closed')
@@ -111,18 +124,8 @@ class Connection:
 
     def set_handler(self, handler):
         self.handler = handler
-        if self.exception:
-            exception = self.exception
-            self.exception = None
-            self._callHandler('handle_exception', exception)
-        if self.input:
-            self._callHandler('handle_input', self.input)
-            self.input = ''
-
-        # Note is self.closed is True, we self closed and we
-        # don't want to call handle_close.
-        if self.closed and isinstance(self.closed, str):
-            self._callHandler('handle_close', self.closed)
+        while self.handler_queue:
+            self._callHandler(*self.handler_queue.pop(0))
 
     def setHandler(self, handler):
         warnings.warn("setHandler is deprecated. Use set_handler,",
@@ -130,17 +133,13 @@ class Connection:
         self.set_handler(handler)
 
     def test_input(self, data):
-        if self.handler is not None:
-            self._callHandler('handle_input', data)
-        else:
-            self.input += data
+        self._callHandler('handle_input', data)
 
     def test_close(self, reason):
-        if self.control is not None:
-            self.control.closed(self)
-        self.closed = reason
-        if self.handler is not None:
-            self._callHandler('handle_close', reason)
+        self._callHandler('handle_close', reason)
+
+    def _exception(self, exception):
+        self._callHandler('handle_exception', exception)
 
     def write(self, data):
         if data is zc.ngi.END_OF_DATA:
@@ -161,12 +160,6 @@ class Connection:
                 self.write(d)
         except Exception, v:
             self._exception(v)
-
-    def _exception(self, exception):
-        if self.handler is None:
-            self.exception = exception
-        else:
-            self._callHandler('handle_exception', exception)
 
 class _ServerConnection(Connection):
     zc.ngi.interfaces.implements(zc.ngi.interfaces.IServerConnection)
