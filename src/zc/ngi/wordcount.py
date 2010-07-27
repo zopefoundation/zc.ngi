@@ -28,12 +28,11 @@ import threading
 import time
 
 import zc.ngi
+import zc.ngi.async
 import zc.ngi.message
 
 _lock = threading.Lock()
 _lock.acquire()
-exit = _lock.release
-run = _lock.acquire
 
 logger = logging.getLogger('zc.ngi.wordcount')
 
@@ -53,11 +52,11 @@ class Server:
             data, self.input = self.input.split('\0', 1)
             if data == 'Q':
                 connection.write('Q\n')
-                connection.write(zc.ngi.END_OF_DATA)
-                connection.control.close(lambda c: exit())
+                connection.close()
+                connection.control.close()
                 return
             elif data == 'C':
-                connection.write(zc.ngi.END_OF_DATA)
+                connection.close()
                 return
             elif data == 'E':
                 raise ValueError(data)
@@ -72,16 +71,15 @@ class Server:
             logger.debug("server handle_close(%r, %r)", connection, reason)
 
 def serve():
-    mod, name, port, level = sys.argv[1:]
-    __import__(mod)
+    port, level = sys.argv[1:]
     logfile = open('server.log', 'w')
     handler = logging.StreamHandler(logfile)
     logging.getLogger().addHandler(handler)
     logger.setLevel(int(level))
     logger.addHandler(logging.StreamHandler())
     logger.info('serving')
-    getattr(sys.modules[mod], name)(('localhost', int(port)), Server)
-    run()
+    zc.ngi.async.listener(('localhost', int(port)), Server)
+    zc.ngi.async.wait(11)
     logging.getLogger().removeHandler(handler)
     handler.close()
 
@@ -127,11 +125,9 @@ def wait(addr, up=True):
         else:
             print "Server still accepting connections"
 
-def start_server_process(listener, loglevel=None):
+def start_server_process(loglevel=None):
     """Start a server in a subprocess and return the port used
     """
-    module = listener.__module__
-    name = listener.__name__
     port = get_port()
     env = dict(
         os.environ,
@@ -140,14 +136,14 @@ def start_server_process(listener, loglevel=None):
     if loglevel is None:
         loglevel = logger.getEffectiveLevel()
     os.spawnle(os.P_NOWAIT, sys.executable, sys.executable, __file__,
-               module, name, str(port), str(loglevel),
+               str(port), str(loglevel),
                env)
     addr = 'localhost', port
     wait(addr)
     return port
 
 def stop_server_process(connect, addr):
-    zc.ngi.message.message(connect, addr, 'Q\0', lambda s: s == 'Q\n')
+    zc.ngi.message.message(connect, addr, 'Q\0')
     wait(addr, up=False)
     log = open('server.log').read()
     os.remove('server.log')

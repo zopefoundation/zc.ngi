@@ -30,7 +30,7 @@ Let's start the wordcount server:
 
     >>> import zc.ngi.wordcount
     >>> import zc.ngi.async
-    >>> port = zc.ngi.wordcount.start_server_process(zc.ngi.async.listener)
+    >>> port = zc.ngi.wordcount.start_server_process()
 
 We passed the listener to be used.
 

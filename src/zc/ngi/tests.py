@@ -638,7 +638,7 @@ def async_evil_setup(test):
 
     # Start the server and connect to a good port with a bad handler
 
-    port = zc.ngi.wordcount.start_server_process(zc.ngi.async.listener)
+    port = zc.ngi.wordcount.start_server_process()
     addr = 'localhost', port
     zc.ngi.async.connect(addr, BrokenAfterConnect())
 
@@ -659,7 +659,7 @@ def async_evil_setup(test):
 
 def cleanup_async(test):
     zc.ngi.async.cleanup_map()
-    zc.ngi.async.wait(1)
+    zc.ngi.async.wait(9)
 
 def test_suite():
     return unittest.TestSuite([
