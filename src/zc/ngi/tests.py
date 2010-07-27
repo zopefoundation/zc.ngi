@@ -490,7 +490,7 @@ def EXPERIMENTAL_thready_async_servers():
     >>> @functools.partial(zc.ngi.async.listener, None, thready=True)
     ... @zc.ngi.generator.handler
     ... def listener(conn):
-    ...     if 'client' not in threading.current_thread().name:
+    ...     if 'client' not in threading.currentThread().getName():
     ...         print 'oops'
     ...     yield
     >>> addr = listener.address
@@ -513,7 +513,7 @@ def EXPERIMENTAL_thready_async_servers():
 
     >>> def count_client_threads():
     ...     return len([t for t in threading.enumerate()
-    ...                 if ("%r client" % (addr, )) in t.name])
+    ...                 if ("%r client" % (addr, )) in t.getName()])
     >>> count_client_threads()
     0
 
