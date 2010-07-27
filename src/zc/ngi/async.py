@@ -51,6 +51,8 @@ BUFFER_SIZE = 8*1024
 class Implementation:
     zc.ngi.interfaces.implements(zc.ngi.interfaces.IImplementation)
 
+    logger = logging.getLogger('zc.ngi.async.Implementation')
+
     def __init__(self, daemon=True, name='zc.ngi.async application created'):
         self.name = name
         self.daemon = daemon
@@ -183,6 +185,8 @@ class Inline(Implementation):
     """Run in an application thread, rather than a separate thread.
     """
 
+    logger = logging.getLogger('zc.ngi.async.Inline')
+
     def start_thread(self):
         pass
 
@@ -218,14 +222,15 @@ class dispatcher(asyncore.dispatcher):
     def writable(self):
         return False
 
-class _Connection(dispatcher):
-    zc.ngi.interfaces.implements(zc.ngi.interfaces.IConnection)
+class _ConnectionDispatcher(dispatcher):
+
+    __connected = True
+    __closed = None
+    __handler = None
+    __iterator_exception = None
+    _connection = None
 
     def __init__(self, sock, addr, logger, implementation):
-        self.__connected = True
-        self.__closed = None
-        self.__handler = None
-        self.__iterator_exception = None
         self.__output = []
         dispatcher.__init__(self, sock, addr, implementation)
         self.logger = logger
@@ -249,7 +254,7 @@ class _Connection(dispatcher):
 
         if self.__closed:
             try:
-                handler.handle_close(self, self.__closed)
+                handler.handle_close(self._connection, self.__closed)
             except:
                 self.logger.exception("Exception raised by handle_close(%r)",
                                       self.__closed)
@@ -272,6 +277,10 @@ class _Connection(dispatcher):
             self.logger.debug('writelines %r', data)
         assert not isinstance(data, str), "writelines does not accept strings"
         self.__output.append(iter(data))
+        self.implementation.notify_select()
+
+    def close_after_write(self):
+        self.__output.append(zc.ngi.END_OF_DATA)
         self.implementation.notify_select()
 
     def close(self):
@@ -303,7 +312,7 @@ class _Connection(dispatcher):
             if __debug__:
                 self.logger.debug('input %r', d)
             try:
-                self.__handler.handle_input(self, d)
+                self.__handler.handle_input(self._connection, d)
             except:
                 self.logger.exception("handle_input failed")
                 raise
@@ -340,7 +349,7 @@ class _Connection(dispatcher):
                         self.__iterator_exception = v
                         raise
                     else:
-                        self.__handler.handle_exception(self, v)
+                        self.__handler.handle_exception(self._connection, v)
 
                 output.insert(0, v)
 
@@ -369,7 +378,7 @@ class _Connection(dispatcher):
             self.logger.debug('close %r', reason)
         if self.__handler is not None:
             try:
-                self.__handler.handle_close(self, reason)
+                self.__handler.handle_close(self._connection, reason)
             except:
                 self.logger.exception("Exception raised by handle_close(%r)",
                                       reason)
@@ -383,18 +392,54 @@ class _Connection(dispatcher):
     def __hash__(self):
         return hash(self.socket)
 
+class _ServerConnectionDispatcher(_ConnectionDispatcher):
+
+    def __init__(self, control, *args):
+        self.control = control
+        _ConnectionDispatcher.__init__(self, *args)
+
+    def close(self):
+        _ConnectionDispatcher.close(self)
+        self.control.closed(self._connection)
+
+class _Connection:
+    zc.ngi.interfaces.implements(zc.ngi.interfaces.IConnection)
+
+    def __init__(self, dispatcher):
+        self._dispatcher = dispatcher
+        dispatcher._connection = self
+
+    def __nonzero__(self):
+        return bool(self._dispatcher)
+
+    def set_handler(self, handler):
+        return self._dispatcher.set_handler(handler)
+
+    def setHandler(self, handler):
+        warnings.warn("setHandler is deprecated. Use set_handler,",
+                      DeprecationWarning, stacklevel=2)
+        self.set_handler(handler)
+
+    def write(self, data):
+        write = self._dispatcher.write
+        self.write = write
+        write(data)
+
+    def writelines(self, data):
+        writelines = self._dispatcher.writelines
+        self.writelines = writelines
+        writelines(data)
+
+    def close(self):
+        self._dispatcher.close_after_write()
+
 
 class _ServerConnection(_Connection):
     zc.ngi.interfaces.implements(zc.ngi.interfaces.IServerConnection)
 
-    def __init__(self, sock, addr, logger, listener, implementation):
-        self.control = listener
-        _Connection.__init__(self, sock, addr, logger, implementation)
-
-    def close(self):
-        _Connection.close(self)
-        self.control.closed(self)
-
+    @property
+    def control(self):
+        return self._dispatcher.control
 
 class _Connector(dispatcher):
 
@@ -468,13 +513,13 @@ class _Connector(dispatcher):
         if __debug__:
             self.logger.debug('outgoing connected %r', self.addr)
 
-        connection = _Connection(self.socket, self.addr, self.logger,
-                                 self.implementation)
+        dispatcher = _ConnectionDispatcher(self.socket, self.addr, self.logger,
+                                           self.implementation)
         try:
-            self.__handler.connected(connection)
+            self.__handler.connected(_Connection(dispatcher))
         except:
             self.logger.exception("connection handler failed")
-            connection.handle_close("connection handler failed")
+            dispatcher.handle_close("connection handler failed")
         return
 
     def handle_error(self):
@@ -575,8 +620,7 @@ class _Listener(BaseListener):
                 # didn't get anything. Hm. Ignore.
                 return
         except socket.error, msg:
-            traceback.print_exception(*sys.exc_info())
-            #self.logger.exception("accepted failed: %s", msg)
+            self.logger.exception("accepted failed: %s", msg)
             return
         if __debug__:
             self.logger.debug('incoming connection %r', addr)
@@ -585,7 +629,10 @@ class _Listener(BaseListener):
             impl = Implementation(name="%r client" % (self.address,))
         else:
             impl = self.implementation
-        connection = _ServerConnection(sock, addr, self.logger, self, impl)
+
+        dispatcher = _ServerConnectionDispatcher(
+            self, sock, addr, self.logger, impl)
+        connection = _ServerConnection(dispatcher)
         self.__connections.add(connection)
 
         @impl.call_from_thread
@@ -613,7 +660,7 @@ class _Listener(BaseListener):
         BaseListener.close(self)
         if handler is None:
             for c in list(self.__connections):
-                c.handle_close("stopped")
+                c._dispatcher.handle_close("stopped")
         elif not self.__connections:
             handler(self)
         else:

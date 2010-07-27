@@ -206,7 +206,7 @@ class OutputFile(_BaseFile):
 
     def close(self):
         if not self._closed:
-            self._connection.write(zc.ngi.END_OF_DATA)
+            self._connection.close()
         self._closed = True
 
     def write(self, data):

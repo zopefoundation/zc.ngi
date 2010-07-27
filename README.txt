@@ -29,6 +29,14 @@ Bugs Fixed:
   connection before set_handler was called on the client, the input
   sent by the server was lost.
 
+- By default, calling close on a connection could caause already
+  written data not to be sent.  Now, don't close connections until
+  data passed to write or writelines as, at least, been passed to the
+  underlying IO system (e.g. socket.send).
+
+  (This means the undocumented practive of sending zc.ngi.END_OF_DATA
+  to write is now deprecated.)
+
 ====================
 2.0.0a3 (2010-07-22)
 ====================
