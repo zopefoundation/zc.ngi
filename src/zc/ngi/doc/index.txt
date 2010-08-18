@@ -900,6 +900,7 @@ word-count server::
     -> '2 3\n'
 
     >>> listener.close()
+    -> CLOSE
 
 We can also use adapters with generator-based handlers by passing an
 adapter factory to ``zc.ngi.generator.handler`` using the
@@ -923,6 +924,7 @@ of the word count server using an adapter::
     >>> connection.write('\nhello out\nthere')
     -> '2 3\n'
     >>> listener.close()
+    -> CLOSE
 
 By separating the low-level protocol handling from the application
 logic, we can reuse the low-level protocol in other applications, and

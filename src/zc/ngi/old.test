@@ -322,8 +322,8 @@ then all server connections are closed immediately and no more
 connections are accepted:
 
     >>> listener.close()
-    server closed: stopped
-    server closed: stopped
+    -> CLOSE
+    -> CLOSE
 
     >>> connection = zc.ngi.testing.Connection()
     >>> listener.connect(connection)
@@ -420,11 +420,11 @@ connect method that can be used to create connections to a server.
 Let's connect our echo server and client. First, we'll create our
 server using the listener constructor:
 
-    >>> listener = zc.ngi.testing.listener(EchoServer)
+    >>> listener = zc.ngi.testing.listener(('localhost', 42), EchoServer)
 
 Then we'll use the connect method on the listener:
 
-    >>> client = EchoClient(listener.connect)
+    >>> client = EchoClient(zc.ngi.testing.connect)
     >>> client.check(('localhost', 42), ['hello', 'world', 'how are you?'])
     server connected
     server got input: 'hello\n'

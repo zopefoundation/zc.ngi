@@ -20,6 +20,22 @@ Changes
 *******
 
 ====================
+2.0.0a5 (2010-08-18)
+====================
+
+New Features:
+
+- Connection objects have a new peer_address attribute, which is
+  equivilent to calling ``getpeername()`` on sockets.
+
+Bugs Fixed:
+
+- Servers using unix-domain sockets didn't clean up socket files.
+
+- When testing listeners were closed, handle_close, rather than close,
+  was called on server connections.
+
+====================
 2.0.0a4 (2010-07-27)
 ====================
 

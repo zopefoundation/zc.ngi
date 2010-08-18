@@ -12,12 +12,15 @@
 #
 ##############################################################################
 from __future__ import with_statement
+from zope.testing import setupstack
 
 import doctest
 import logging
 import manuel.capture
 import manuel.doctest
 import manuel.testing
+import os
+import socket
 import sys
 import threading
 import time
@@ -601,6 +604,116 @@ the connection before the client handler is set, the client must see the input:
 """
 
 
+def async_peer_address():
+    r"""
+    >>> @zc.ngi.adapters.Lines.handler
+    ... def server(connection):
+    ...     host, port = connection.peer_address
+    ...     if not (host == '127.0.0.1' and isinstance(port, int)):
+    ...         print 'oops', host, port
+    ...     data = (yield)
+    ...     connection.write(data+'\n')
+    ...     listener.close()
+
+    >>> listener = zc.ngi.async.listener(None, server)
+
+    >>> @zc.ngi.adapters.Lines.handler
+    ... def client(connection):
+    ...     connection.write('hi\n')
+    ...     yield
+
+    >>> zc.ngi.async.connect(listener.address, client); zc.ngi.async.wait(1)
+
+    """
+
+def testing_peer_address():
+    r"""
+    >>> @zc.ngi.adapters.Lines.handler
+    ... def server(connection):
+    ...     print `connection.peer_address`
+    ...     data = (yield)
+    ...     connection.write(data+'\n')
+    ...     listener.close()
+
+    >>> listener = zc.ngi.testing.listener('', server)
+
+    >>> @zc.ngi.adapters.Lines.handler
+    ... def client(connection):
+    ...     connection.write('hi\n')
+    ...     yield
+
+    >>> zc.ngi.testing.connect(listener.address, client,
+    ...                        client_address=('xxx', 0))
+    ('xxx', 0)
+
+    Obscure:
+
+    >>> conn = zc.ngi.testing.Connection(address='1', peer_address='2')
+    >>> conn.peer_address, conn.peer.peer_address
+    ('2', '1')
+
+    >>> conn = zc.ngi.testing.Connection()
+    >>> zc.ngi.testing.connectable('x', conn)
+    >>> zc.ngi.testing.connect('x', client, client_address='y')
+    -> 'hi\n'
+
+    >>> conn.peer_address, conn.peer.peer_address
+    ('x', 'y')
+
+    """
+
+def async_close_unix():
+    """
+
+When we create and the close a unix-domain socket, we remove the
+socket file so we can reopen it later.
+
+    >>> os.listdir('.')
+    []
+
+    >>> listener = zc.ngi.async.listener('socket', lambda c: None)
+    >>> os.listdir('.')
+    ['socket']
+
+    >>> listener.close(); zc.ngi.async.wait(1)
+    >>> os.listdir('.')
+    []
+
+    >>> listener = zc.ngi.async.listener('socket', lambda c: None)
+    >>> os.listdir('.')
+    ['socket']
+
+    >>> listener.close(); zc.ngi.async.wait(1)
+    >>> os.listdir('.')
+    []
+
+    """
+
+def async_peer_address_unix():
+    r"""
+    >>> @zc.ngi.adapters.Lines.handler
+    ... def server(connection):
+    ...     print `connection.peer_address`
+    ...     data = (yield)
+    ...     connection.write(data+'\n')
+    ...     listener.close()
+
+    >>> listener = zc.ngi.async.listener('sock', server)
+
+    >>> @zc.ngi.adapters.Lines.handler
+    ... def client(connection):
+    ...     connection.write('hi\n')
+    ...     yield
+
+    >>> zc.ngi.async.connect(listener.address, client); zc.ngi.async.wait(1)
+    ''
+
+    """
+
+if not hasattr(socket, 'AF_UNIX'):
+    # windows
+    del async_peer_address_unix, async_close_unix
+
 if sys.version_info < (2, 6):
     del setHandler_compatibility
 
@@ -618,15 +731,18 @@ class BrokenAfterConnect:
 
     handle_input = handle_close = lambda: xxxxx
 
+def setUp(test):
+    cleanup()
+    setupstack.setUpDirectory(test)
+    setupstack.register(test, cleanup)
+
 def async_evil_setup(test):
+    setUp(test)
 
     # Uncomment the next 2 lines to check that a bunch of lambda type
     # errors are logged.
     #import logging
     #logging.getLogger().addHandler(logging.StreamHandler())
-
-    # clean up the map.
-    zc.ngi.async.cleanup_map()
 
     # See if we can break the main loop before running the async test
 
@@ -657,7 +773,8 @@ def async_evil_setup(test):
     zc.ngi.async.listener(addr, BrokenAfterConnect())
     zc.ngi.async.connect(addr, BrokenAfterConnect())
 
-def cleanup_async(test):
+def cleanup():
+    zc.ngi.testing._connectable.clear()
     zc.ngi.async.cleanup_map()
     zc.ngi.async.wait(9)
 
@@ -666,7 +783,7 @@ def test_suite():
         manuel.testing.TestSuite(
             manuel.capture.Manuel() + manuel.doctest.Manuel(),
             'doc/index.txt',
-            ),
+            setUp=setUp, tearDown=setupstack.tearDown),
         doctest.DocFileSuite(
             'old.test',
             'testing.test',
@@ -674,12 +791,12 @@ def test_suite():
             'adapters.test',
             'blocking.test',
             'async-udp.test',
-            tearDown=cleanup_async),
+            setUp=setUp, tearDown=setupstack.tearDown),
         doctest.DocFileSuite(
             'async.test',
-            setUp=async_evil_setup, tearDown=cleanup_async,
+            setUp=async_evil_setup, tearDown=setupstack.tearDown,
             ),
-        doctest.DocTestSuite(setUp=cleanup_async, tearDown=cleanup_async),
+        doctest.DocTestSuite(setUp=setUp, tearDown=setupstack.tearDown),
         ])
 
 if __name__ == '__main__':

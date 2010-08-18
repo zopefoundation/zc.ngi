@@ -48,13 +48,15 @@ class Connection:
 
     zc.ngi.interfaces.implements(zc.ngi.interfaces.IConnection)
 
-    def __init__(self, peer=None, handler=PrintingHandler):
+    def __init__(self, peer=None, handler=PrintingHandler,
+                 address=None, peer_address=None):
         self.handler = None
+        self.address = address
         self.handler_queue = []
         self.control = None
         self.closed = None
         if peer is None:
-            peer = Connection(self)
+            peer = Connection(self, address=peer_address)
             handler(peer)
         self.peer = peer
 
@@ -74,15 +76,13 @@ class Connection:
 
         if self.queue is None:
             self.queue = queue = [(method, arg)]
-            while queue:
+            while queue and not self.closed:
                 method, arg = queue.pop(0)
 
                 if method == 'handle_close':
                     if self.control is not None:
                         self.control.closed(self)
                     self.closed = arg
-                elif self.closed:
-                    break
 
                 try:
                     try:
@@ -102,7 +102,7 @@ class Connection:
                             raise
 
                     handler(self, arg)
-                except:
+                except Exception, v:
                     print "Error test connection calling connection handler:"
                     traceback.print_exc(file=sys.stdout)
                     if method != 'handle_close':
@@ -114,6 +114,8 @@ class Connection:
             self.queue.append((method, arg))
 
     def close(self):
+        if self.closed:
+            return
         self.peer.test_close('closed')
         if self.control is not None:
             self.control.closed(self)
@@ -161,8 +163,16 @@ class Connection:
         except Exception, v:
             self._exception(v)
 
+    @property
+    def peer_address(self):
+        return self.peer.address
+
 class _ServerConnection(Connection):
     zc.ngi.interfaces.implements(zc.ngi.interfaces.IServerConnection)
+
+    def __init__(self):
+        Connection.__init__(self, False) # False to avoid setting peer handler
+        self.peer = Connection(self)
 
 class TextPrintingHandler(PrintingHandler):
 
@@ -174,13 +184,17 @@ def TextConnection(peer=None, handler=TextPrintingHandler):
 
 _connectable = {}
 _recursing = object()
-def connect(addr, handler):
+def connect(addr, handler, client_address=None):
     connections = _connectable.get(addr)
     if isinstance(connections, list):
         if connections:
-            return handler.connected(connections.pop(0))
+            connection = connections.pop(0)
+            connection.peer.address = addr
+            connection.address = client_address
+            return handler.connected(connection)
     elif isinstance(connections, listener):
-        return connections.connect(addr, handler=handler)
+        return connections.connect(handler=handler,
+                                   client_address=client_address)
     elif connections is _recursing:
         print (
             "For address, %r, a connect handler called connect from a\n"
@@ -201,6 +215,7 @@ connector = connect
 def connectable(addr, connection):
     _connectable.setdefault(addr, []).append(connection)
 
+
 class listener:
     zc.ngi.interfaces.implements(zc.ngi.interfaces.IListener)
 
@@ -215,22 +230,30 @@ class listener:
         self._close_handler = None
         self._connections = []
 
-    def connect(self, connection=None, handler=None):
-        if handler is not None:
-            # connection is addr in this case and is ignored
-            handler.connected(Connection(None, self._handler))
-            return
+    def connect(self, connection=None, handler=None, client_address=None):
         if self._handler is None:
             raise TypeError("Listener closed")
-        if connection is None:
+
+        try: # Round about None (or legacy addr) test
+            connection.write
+            orig = connection
+        except AttributeError:
             connection = _ServerConnection()
-            peer = connection.peer
-        else:
-            peer = None
-        self._connections.append(connection)
+            orig = None
+
         connection.control = self
+        connection.peer.address = client_address
+        connection.address = self.address
+        self._connections.append(connection)
         self._handler(connection)
-        return peer
+
+        if handler is not None:
+            handler.connected(connection.peer)
+        elif orig is None:
+            PrintingHandler(connection.peer)
+            return connection.peer
+
+        return None
 
     connector = connect
 
@@ -243,7 +266,7 @@ class listener:
         self._handler = None
         if handler is None:
             while self._connections:
-                self._connections[0].test_close('stopped')
+                self._connections[0].close()
         elif not self._connections:
             handler(self)
         else:

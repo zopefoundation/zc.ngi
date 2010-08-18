@@ -31,6 +31,12 @@ by applications.
 .. autoclass:: IConnection
    :members:
 
+   .. attribute:: peer_address
+
+      For server connections, the address of the client. For clients,
+      the server address.  For socket-based implementations, this is
+      the result of calling ``getpeername()`` on the socket.
+
 .. autoclass:: IImplementation
    :members:
 

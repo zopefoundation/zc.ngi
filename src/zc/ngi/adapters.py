@@ -61,6 +61,10 @@ class Base(object):
     def handler(class_, func):
         return zc.ngi.generator.handler(func, class_)
 
+    @property
+    def peer_address(self):
+        return self.connection.peer_address
+
 class Lines(Base):
 
     input = ''

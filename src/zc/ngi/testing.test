@@ -45,7 +45,6 @@ simple example:
     client i got: Hi
     server h got: Hi
     client h got: Bye
-    client closed b closed
 
 If an exeption is raised by a handler, then the exception is logged
 and the connection is closed (if not already closed).

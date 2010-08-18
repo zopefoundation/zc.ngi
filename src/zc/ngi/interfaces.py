@@ -127,6 +127,16 @@ class IConnection(Interface):
         any time.
         """
 
+    peer_address = Attribute(
+        """The peer address
+
+        For socket-based connectionss, this is the result of calling
+        getpeername on the socket.
+
+        This is primarily interesting for servers that want to vary
+        behavior depending on where clients connect from.
+        """)
+
 class IServerConnection(IConnection):
     """Server connection
 

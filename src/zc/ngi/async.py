@@ -433,6 +433,9 @@ class _Connection:
     def close(self):
         self._dispatcher.close_after_write()
 
+    @property
+    def peer_address(self):
+        return self._dispatcher.socket.getpeername()
 
 class _ServerConnection(_Connection):
     zc.ngi.interfaces.implements(zc.ngi.interfaces.IServerConnection)
@@ -569,6 +572,7 @@ class _Listener(BaseListener):
         self.__close_handler = None
         self._thready = thready
         self.__connections = set()
+        self.address = addr
         BaseListener.__init__(self, implementation)
         if isinstance(addr, str):
             family = socket.AF_UNIX
@@ -658,6 +662,9 @@ class _Listener(BaseListener):
 
     def _close(self, handler):
         BaseListener.close(self)
+        if isinstance(self.address, str) and os.path.exists(self.address):
+            os.remove(self.address)
+
         if handler is None:
             for c in list(self.__connections):
                 c._dispatcher.handle_close("stopped")
