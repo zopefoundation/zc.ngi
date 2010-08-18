@@ -20,7 +20,7 @@ Changes
 *******
 
 ====================
-2.0.0a5 (2010-08-18)
+2.0.0a5 (2010-08-19)
 ====================
 
 New Features:
@@ -34,6 +34,12 @@ Bugs Fixed:
 
 - When testing listeners were closed, handle_close, rather than close,
   was called on server connections.
+
+- The zc.ngi.async connections' ``write`` and ``writelines`` methods
+  didn't raise errors when called on closed connections.
+
+- The built-in connection adapters and handy adapter base class
+  didn't implement __nonzero__.
 
 ====================
 2.0.0a4 (2010-07-27)

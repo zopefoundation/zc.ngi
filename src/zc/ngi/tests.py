@@ -50,6 +50,14 @@ if sys.version_info >= (2, 6):
 else:
     del blocking_warns
 
+def wait_until(func, timeout=30):
+    deadline = time.time()+timeout
+    while 1:
+        if func():
+            break
+        if time.time() > deadline:
+            raise ValueError("Timeout")
+        time.sleep(.01)
 
 
 def test_async_cannot_connect():
@@ -203,17 +211,10 @@ def async_error_in_client_when_conection_is_closed():
     """
 If a connection is closed, we need to make sure write calls generate errors.
 
-    >>> logger = logging.getLogger('zc.ngi')
-    >>> log_handler = logging.StreamHandler(sys.stdout)
-    >>> logger.addHandler(log_handler)
-    >>> logger.setLevel(logging.WARNING)
-
-    >>> server_event = threading.Event()
     >>> @zc.ngi.generator.handler
     ... def server(conn):
-    ...     data = yield
-    ...     print data
-    ...     server_event.set()
+    ...     while 1:
+    ...        print (yield)
 
     >>> listener = zc.ngi.async.listener(None, server)
 
@@ -222,6 +223,7 @@ If a connection is closed, we need to make sure write calls generate errors.
     ...         self.event = threading.Event()
     ...     def connected(self, conn):
     ...         self.conn = conn
+    ...         conn.set_handler(self)
     ...         self.event.set()
 
     >>> connector = Connector()
@@ -231,26 +233,18 @@ If a connection is closed, we need to make sure write calls generate errors.
 OK, we've connected.  If we close the connection, we won't be able to write:
 
     >>> connector.conn.close()
-    >>> connector.conn.write('xxx')
 
-    >>> connector.conn.writelines(['xxx', 'yyy'])
-
-Similarly if the server closes the connection:
-
-    >>> connector = Connector()
-    >>> zc.ngi.async.connect(listener.address, connector)
-    >>> _ = connector.event.wait(1)
-
-    >>> connector.conn.write('aaa'); _ = server_event.wait(1)
-    aaa
+    >>> wait_until(lambda : not connector.conn)
 
     >>> connector.conn.write('xxx')
+    Traceback (most recent call last):
+    ...
+    ValueError: write called on closed connection
 
     >>> connector.conn.writelines(['xxx', 'yyy'])
-
-
-    >>> logger.removeHandler(log_handler)
-    >>> logger.setLevel(logging.NOTSET)
+    Traceback (most recent call last):
+    ...
+    ValueError: writelines called on closed connection
 
     >>> listener.close()
     """

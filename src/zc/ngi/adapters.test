@@ -144,3 +144,17 @@ Closing works too.
 
     >>> connection.test_close('test')
     -> CLOSE test
+
+Booleanness
+===========
+
+    >>> connection = zc.ngi.testing.Connection()
+    >>> adapter = zc.ngi.adapters.Lines(connection)
+    >>> bool(adapter)
+    True
+
+    >>> adapter.close()
+    -> CLOSE
+
+    >>> bool(adapter)
+    False

@@ -65,6 +65,9 @@ class Base(object):
     def peer_address(self):
         return self.connection.peer_address
 
+    def __nonzero__(self):
+        return bool(self.connection)
+
 class Lines(Base):
 
     input = ''

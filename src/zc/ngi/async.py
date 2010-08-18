@@ -224,7 +224,6 @@ class dispatcher(asyncore.dispatcher):
 
 class _ConnectionDispatcher(dispatcher):
 
-    __connected = True
     __closed = None
     __handler = None
     __iterator_exception = None
@@ -236,7 +235,7 @@ class _ConnectionDispatcher(dispatcher):
         self.logger = logger
 
     def __nonzero__(self):
-        return self.__connected
+        return self.__output is not None
 
     def set_handler(self, handler):
         if self.__handler is not None:
@@ -269,23 +268,37 @@ class _ConnectionDispatcher(dispatcher):
         if __debug__:
             self.logger.debug('write %r', data)
         assert isinstance(data, str) or (data is zc.ngi.END_OF_DATA)
-        self.__output.append(data)
+        try:
+            self.__output.append(data)
+        except AttributeError:
+            if self.__output is None:
+                raise ValueError("write called on closed connection")
+            raise
         self.implementation.notify_select()
 
     def writelines(self, data):
         if __debug__:
             self.logger.debug('writelines %r', data)
         assert not isinstance(data, str), "writelines does not accept strings"
-        self.__output.append(iter(data))
+        try:
+            self.__output.append(iter(data))
+        except AttributeError:
+            if self.__output is None:
+                raise ValueError("writelines called on closed connection")
+            raise
         self.implementation.notify_select()
 
     def close_after_write(self):
-        self.__output.append(zc.ngi.END_OF_DATA)
+        try:
+            self.__output.append(zc.ngi.END_OF_DATA)
+        except AttributeError:
+            if self.__output is None:
+                return # already closed
+            raise
         self.implementation.notify_select()
 
     def close(self):
-        self.__connected = False
-        self.__output[:] = []
+        self.__output = None
         dispatcher.close(self)
         self.implementation.notify_select()
 
