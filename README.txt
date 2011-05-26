@@ -20,6 +20,15 @@ Changes
 *******
 
 ====================
+2.0.0a6 (2011-05-26)
+====================
+
+Bugs Fixed
+
+- If application code made many small writes, each write was sent
+  individually, which could trigger Nagle's algorithm.
+
+====================
 2.0.0a5 (2010-08-19)
 ====================
 

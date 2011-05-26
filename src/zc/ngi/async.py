@@ -337,54 +337,68 @@ class _ConnectionDispatcher(dispatcher):
         if __debug__:
             self.logger.debug('handle_write_event')
 
-        while self.__output:
-            output = self.__output
-            v = output[0]
-            if v is zc.ngi.END_OF_DATA:
-                self.close()
-                return
-
-            if not isinstance(v, str):
-                # Must be an iterator
-                try:
-                    v = v.next()
-                    if not isinstance(v, str):
-                        raise TypeError(
-                            "writelines iterator must return strings",
-                            v)
-                except StopIteration:
-                    # all done
+        tosend = []
+        nsend = 0
+        send_size = 60000
+        output = self.__output
+        try:
+            while output:
+                v = output[0]
+                if v is zc.ngi.END_OF_DATA:
+                    if not nsend:
+                        self.close()
+                        return
+                    send_size = 0
+                elif isinstance(v, str):
+                    tosend.append(v)
+                    nsend += len(v)
                     output.pop(0)
-                    continue
-                except Exception, v:
-                    self.logger.exception("writelines iterator failed")
-                    if self.__handler is None:
-                        self.__iterator_exception = v
+                else:
+                    # Must be an iterator
+                    try:
+                        v = v.next()
+                        if not isinstance(v, str):
+                            raise TypeError(
+                                "writelines iterator must return strings", v)
+                    except StopIteration:
+                        # all done
+                        output.pop(0)
+                    except Exception, v:
+                        self.logger.exception("writelines iterator failed")
+                        if self.__handler is None:
+                            self.__iterator_exception = v
+                        else:
+                            self.__handler.handle_exception(self._connection, v)
                         raise
                     else:
-                        self.__handler.handle_exception(self._connection, v)
+                        tosend.append(v)
+                        nsend += len(v)
 
-                output.insert(0, v)
+                if output and nsend < send_size:
+                    continue
 
-            if not v:
-                output.pop(0)
-                continue
+                v = ''.join(tosend)
+                try:
+                    n = self.send(v)
+                except socket.error, err:
+                    if err[0] in expected_socket_write_errors:
+                        return # we couldn't write anything
+                    raise
+                except Exception, v:
+                    self.logger.exception("send failed")
+                    raise
 
-            try:
-                n = self.send(v)
-            except socket.error, err:
-                if err[0] in expected_socket_write_errors:
-                    return # we couldn't write anything
-                raise
-            except Exception, v:
-                self.logger.exception("send failed")
-                raise
+                if n == nsend:
+                    nsend = 0
+                    del tosend[:]
+                else:
+                    nsend -= n
+                    tosend[:] = v[n:],
+                    return # can't send any more
+        finally:
+            if nsend:
+                self.output[0:0] = tosend
 
-            if n == len(v):
-                output.pop(0)
-            else:
-                output[0] = v[n:]
-                return # can't send any more
 
     def handle_close(self, reason='end of input'):
         if __debug__:
