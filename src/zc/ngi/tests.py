@@ -63,7 +63,6 @@ def wait_until(func, timeout=30):
 def test_async_cannot_connect():
     """Let's make sure that the connector handles connection failures correctly
 
-    >>> import threading
     >>> lock = threading.Lock()
     >>> _ = lock.acquire()
 
@@ -482,7 +481,7 @@ def EXPERIMENTAL_thready_async_servers():
     When creating a listener with a zc.ngi.async.Implementation, you can
     pass a thready keyword options to cause each client to get it's own thread.
 
-    >>> import functools, threading, zc.ngi.generator
+    >>> import functools
 
     >>> @functools.partial(zc.ngi.async.listener, None, thready=True)
     ... @zc.ngi.generator.handler
@@ -702,6 +701,33 @@ def async_peer_address_unix():
     >>> zc.ngi.async.connect(listener.address, client); zc.ngi.async.wait(1)
     ''
 
+    """
+
+def async_bind_to_port_0():
+    r"""
+
+    When we bind to port 0, the listener has the actual address:
+
+    >>> def server(conn):
+    ...     conn.write('go away')
+    ...     conn.close()
+
+    >>> listener = zc.ngi.async.listener(('127.0.0.1', 0), server)
+    >>> host, port = listener.address
+    >>> host == '127.0.0.1' and port > 0
+    True
+
+    Make sure it works. :)
+
+    >>> event = threading.Event()
+
+    >>> @zc.ngi.generator.handler
+    ... def client(conn):
+    ...     print (yield)
+    ...     event.set()
+
+    >>> zc.ngi.async.connect(listener.address, client); _ = event.wait(1)
+    go away
     """
 
 if not hasattr(socket, 'AF_UNIX'):

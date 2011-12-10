@@ -627,6 +627,8 @@ class _Listener(BaseListener):
                     break
             else:
                 self.bind(addr)
+                if family is socket.AF_INET and addr[1] == 0:
+                    self.addr = addr = addr[0], self.socket.getsockname()[1]
 
             self.logger.info("listening on %r", addr)
             self.listen(255)

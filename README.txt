@@ -20,6 +20,15 @@ Changes
 *******
 
 ====================
+2.0.0 (2011-12-10)
+====================
+
+Bugs Fixed
+
+- zc.ngi.async listeners didn't provide the real address when binding
+  to port 0.
+
+====================
 2.0.0a6 (2011-05-26)
 ====================
 
