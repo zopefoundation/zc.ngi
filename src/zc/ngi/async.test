@@ -47,15 +47,23 @@ shouldn't get any output.
     >>> _ = [thread.start() for thread in threads]
     >>> _ = [thread.join() for thread in threads]
 
+Large input
+===========
+
+    >>> import zc.ngi.blocking
+    >>> output, input = zc.ngi.blocking.open(addr, zc.ngi.async.connect,
+    ...                                      timeout=1.0)
+
+    >>> output.write('hello world\n' * 20000 + '\0')
+    >>> input.readline(timeout=1.0)
+    '20000 40000 240000\n'
+
 Iterable input
 ==============
 
 We can pass data to the server using an iterator.  To illustrate this,
 we'll use the blocking interface:
 
-    >>> import zc.ngi.blocking
-    >>> output, input = zc.ngi.blocking.open(addr, zc.ngi.async.connect,
-    ...                                      timeout=1.0)
     >>> def hello(name):
     ...     yield "hello\n"
     ...     yield name

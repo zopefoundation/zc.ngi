@@ -20,6 +20,15 @@ Changes
 *******
 
 ====================
+2.0.1 (2012-04-06)
+====================
+
+Bugs Fixed
+
+- Sending data faster than a socket could transmit it wasn't handled
+  correctly.
+
+====================
 2.0.0 (2011-12-10)
 ====================
 

@@ -397,7 +397,7 @@ class _ConnectionDispatcher(dispatcher):
                     return # can't send any more
         finally:
             if nsend:
-                self.output[0:0] = tosend
+                output[0:0] = tosend
 
 
     def handle_close(self, reason='end of input'):
