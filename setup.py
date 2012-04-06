@@ -12,7 +12,7 @@
 #
 ##############################################################################
 
-name, version = 'zc.ngi', '0'
+name, version = 'zc.ngi', '2.0.1'
 
 from setuptools import setup, find_packages
 
