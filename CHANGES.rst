@@ -2,7 +2,7 @@ Changelog
 =========
 
 
-2.1.0.dev0 (unreleased)
+2.1.0 (unreleased)
 -----------------------
 
 New features:
