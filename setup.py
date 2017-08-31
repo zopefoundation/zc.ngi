@@ -12,11 +12,16 @@
 #
 ##############################################################################
 
-name, version = 'zc.ngi', '0'
+name = 'zc.ngi'
+version = "2.1.0.dev0"
 
 from setuptools import setup, find_packages
 
-readme = open('README.txt').read()
+readme = (
+    open('README.rst').read()
+    + '\n' +
+    open('CHANGES.rst').read()
+    + '\n')
 
 tests_require = ['zope.testing', 'manuel']
 
