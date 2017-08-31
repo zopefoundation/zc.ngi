@@ -48,6 +48,21 @@ expected_socket_write_errors = {
 
 BUFFER_SIZE = 8*1024
 
+
+def get_family_from_address(addr):
+    if addr is None:
+        # keep backward compatibility
+        return socket.AF_INET
+    elif isinstance(addr, str):
+        return socket.AF_UNIX
+    elif isinstance(addr, tuple):
+        if ":" in addr[0]:
+            return socket.AF_INET6
+        else:
+            return socket.AF_INET
+    raise ValueError("addr should be string or tuple of ip address, port")
+
+
 class Implementation:
     zc.ngi.interfaces.implements(zc.ngi.interfaces.IImplementation)
 
@@ -82,10 +97,7 @@ class Implementation:
         return result
 
     def udp(self, address, message):
-        if isinstance(address, str):
-            family = socket.AF_UNIX
-        else:
-            family = socket.AF_INET
+        family = get_family_from_address(address)
         try:
             sock = _udp_socks[family].pop()
         except IndexError:
@@ -493,10 +505,8 @@ class _Connector(dispatcher):
 
     def __init__(self, addr, handler, implementation):
         self.__handler = handler
-        if isinstance(addr, str):
-            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        else:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        family = get_family_from_address(addr)
+        sock = socket.socket(family, socket.SOCK_STREAM)
 
         dispatcher.__init__(self, sock, addr, implementation)
 
@@ -601,10 +611,8 @@ class _Listener(BaseListener):
         self.__connections = set()
         self.address = addr
         BaseListener.__init__(self, implementation)
-        if isinstance(addr, str):
-            family = socket.AF_UNIX
-        else:
-            family = socket.AF_INET
+        family = get_family_from_address(addr)
+
         self.create_socket(family, socket.SOCK_STREAM)
         try:
             if not is_win32:
@@ -627,7 +635,7 @@ class _Listener(BaseListener):
                     break
             else:
                 self.bind(addr)
-                if family is socket.AF_INET and addr[1] == 0:
+                if family in (socket.AF_INET, socket.AF_INET6) and addr[1] == 0:
                     self.addr = addr = addr[0], self.socket.getsockname()[1]
 
             self.logger.info("listening on %r", addr)
@@ -724,10 +732,7 @@ class _UDPListener(BaseListener):
         self.__handler = handler
         self.__buffer_size = buffer_size
         BaseListener.__init__(self, implementation)
-        if isinstance(addr, str):
-            family = socket.AF_UNIX
-        else:
-            family = socket.AF_INET
+        family = get_family_from_address(addr)
         try:
             self.create_socket(family, socket.SOCK_DGRAM)
             if not is_win32:
