@@ -730,9 +730,32 @@ def async_bind_to_port_0():
     go away
     """
 
+def test_get_family_from_address():
+    r"""
+    >>> zc.ngi.async.get_family_from_address(None) == socket.AF_INET
+    True
+    >>> zc.ngi.async.get_family_from_address(('128.0.0.2', 8000)) == socket.AF_INET
+    True
+    >>> zc.ngi.async.get_family_from_address(('::', 8000)) == socket.AF_INET6
+    True
+    >>> zc.ngi.async.get_family_from_address(8000)
+    Traceback (most recent call last):
+    ...
+    ValueError: addr should be string or tuple of ip address, port
+    """
+
+def test_get_family_from_address_unix():
+    r"""
+    >>> zc.ngi.async.get_family_from_address('/tmp/unix_socket') == socket.AF_UNIX
+    True
+    """
+
 if not hasattr(socket, 'AF_UNIX'):
     # windows
-    del async_peer_address_unix, async_close_unix
+    del (
+        async_peer_address_unix, async_close_unix,
+        test_get_family_from_address_unix
+    )
 
 if sys.version_info < (2, 6):
     del setHandler_compatibility
