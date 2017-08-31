@@ -48,6 +48,21 @@ expected_socket_write_errors = {
 
 BUFFER_SIZE = 8*1024
 
+
+def get_family_from_address(addr):
+    if addr is None:
+        # keep backward compatibility
+        return socket.AF_INET
+    elif isinstance(addr, str):
+        return socket.AF_UNIX
+    elif isinstance(addr, tuple):
+        if ":" in addr[0]:
+            return socket.AF_INET6
+        else:
+            return socket.AF_INET
+    raise ValueError("addr should be string or tuple of ip address, port")
+
+
 class Implementation:
     zc.ngi.interfaces.implements(zc.ngi.interfaces.IImplementation)
 
@@ -82,10 +97,7 @@ class Implementation:
         return result
 
     def udp(self, address, message):
-        if isinstance(address, str):
-            family = socket.AF_UNIX
-        else:
-            family = socket.AF_INET
+        family = get_family_from_address(address)
         try:
             sock = _udp_socks[family].pop()
         except IndexError:
@@ -493,10 +505,8 @@ class _Connector(dispatcher):
 
     def __init__(self, addr, handler, implementation):
         self.__handler = handler
-        if isinstance(addr, str):
-            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        else:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        family = get_family_from_address(addr)
+        sock = socket.socket(family, socket.SOCK_STREAM)
 
         dispatcher.__init__(self, sock, addr, implementation)
 
@@ -601,10 +611,8 @@ class _Listener(BaseListener):
         self.__connections = set()
         self.address = addr
         BaseListener.__init__(self, implementation)
-        if isinstance(addr, str):
-            family = socket.AF_UNIX
-        else:
-            family = socket.AF_INET
+        family = get_family_from_address(addr)
+
         self.create_socket(family, socket.SOCK_STREAM)
         try:
             if not is_win32:
@@ -627,7 +635,7 @@ class _Listener(BaseListener):
                     break
             else:
                 self.bind(addr)
-                if family is socket.AF_INET and addr[1] == 0:
+                if family in (socket.AF_INET, socket.AF_INET6) and addr[1] == 0:
                     self.addr = addr = addr[0], self.socket.getsockname()[1]
 
             self.logger.info("listening on %r", addr)
@@ -724,10 +732,7 @@ class _UDPListener(BaseListener):
         self.__handler = handler
         self.__buffer_size = buffer_size
         BaseListener.__init__(self, implementation)
-        if isinstance(addr, str):
-            family = socket.AF_UNIX
-        else:
-            family = socket.AF_INET
+        family = get_family_from_address(addr)
         try:
             self.create_socket(family, socket.SOCK_DGRAM)
             if not is_win32:
@@ -831,39 +836,39 @@ else:
 
             count = 0
             while 1:
-               count += 1
-               # Bind to a local port; for efficiency, let the OS pick
-               # a free port for us.
-               # Unfortunately, stress tests showed that we may not
-               # be able to connect to that port ("Address already in
-               # use") despite that the OS picked it.  This appears
-               # to be a race bug in the Windows socket implementation.
-               # So we loop until a connect() succeeds (almost always
-               # on the first try).  See the long thread at
-               # http://mail.zope.org/pipermail/zope/2005-July/160433.html
-               # for hideous details.
-               a = socket.socket()
-               a.bind(("127.0.0.1", 0))
-               connect_address = a.getsockname()  # assigned (host, port) pair
-               a.listen(1)
-               try:
-                   w.connect(connect_address)
-                   break    # success
-               except socket.error, detail:
-                   if detail[0] != errno.WSAEADDRINUSE:
-                       # "Address already in use" is the only error
-                       # I've seen on two WinXP Pro SP2 boxes, under
-                       # Pythons 2.3.5 and 2.4.1.
-                       raise
-                   # (10048, 'Address already in use')
-                   # assert count <= 2 # never triggered in Tim's tests
-                   if count >= 10:  # I've never seen it go above 2
-                       a.close()
-                       w.close()
-                       raise BindError("Cannot bind trigger!")
-                   # Close `a` and try again.  Note:  I originally put a short
-                   # sleep() here, but it didn't appear to help or hurt.
-                   a.close()
+                count += 1
+                # Bind to a local port; for efficiency, let the OS pick
+                # a free port for us.
+                # Unfortunately, stress tests showed that we may not
+                # be able to connect to that port ("Address already in
+                # use") despite that the OS picked it.  This appears
+                # to be a race bug in the Windows socket implementation.
+                # So we loop until a connect() succeeds (almost always
+                # on the first try).  See the long thread at
+                # http://mail.zope.org/pipermail/zope/2005-July/160433.html
+                # for hideous details.
+                a = socket.socket()
+                a.bind(("127.0.0.1", 0))
+                connect_address = a.getsockname()  # assigned (host, port) pair
+                a.listen(1)
+                try:
+                    w.connect(connect_address)
+                    break    # success
+                except socket.error, detail:
+                    if detail[0] != errno.WSAEADDRINUSE:
+                        # "Address already in use" is the only error
+                        # I've seen on two WinXP Pro SP2 boxes, under
+                        # Pythons 2.3.5 and 2.4.1.
+                        raise
+                    # (10048, 'Address already in use')
+                    # assert count <= 2 # never triggered in Tim's tests
+                    if count >= 10:  # I've never seen it go above 2
+                        a.close()
+                        w.close()
+                        raise BindError("Cannot bind trigger!")
+                    # Close `a` and try again.  Note:  I originally put a short
+                    # sleep() here, but it didn't appear to help or hurt.
+                    a.close()
 
             r, addr = a.accept()  # r becomes asyncore's (self.)socket
             a.close()
