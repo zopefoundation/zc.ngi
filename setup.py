@@ -25,6 +25,15 @@ readme = (
 
 tests_require = ['zope.testing', 'manuel']
 
+classifiers = """\
+Intended Audience :: Developers
+License :: OSI Approved :: MIT License
+Programming Language :: Python
+Programming Language :: Python :: 2
+Programming Language :: Python :: 2.7
+Programming Language :: Python :: Implementation :: CPython
+""".strip().split('\n')
+
 setup(
     name = name, version=version,
     author = "Jim Fulton",
@@ -44,4 +53,5 @@ setup(
     install_requires = ['setuptools'],
     extras_require = dict(test=tests_require),
     zip_safe = False,
+    classifiers=classifiers,
     )

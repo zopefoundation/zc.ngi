@@ -1,5 +1,6 @@
 include *.py
 include *.txt
+include *.rst
 include .travis.yml
 include buildout.cfg
 recursive-include src *.py
